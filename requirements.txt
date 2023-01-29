@@ -1,0 +1,4 @@
+mypy-protobuf==3.4.0
+opuslib==3.0.1
+protobuf==4.21.12
+types-protobuf==4.21.0.3
