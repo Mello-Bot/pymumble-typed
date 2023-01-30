@@ -1,22 +1,17 @@
 from enum import Enum
-from typing import Callable
 
 
-class Callbacks(str, Enum):
+class Callback(str, Enum):
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
-    CHANNELCREATED = "channel_created"
-    CHANNELUPDATED = "channel_updated"
-    CHANNELREMOVED = "channel_remove"
-    USERCREATED = "user_created"
-    USERUPDATED = "user_updated"
-    USERREMOVED = "user_removed"
-    SOUNDRECEIVED = "sound_received"
-    TEXTMESSAGERECEIVED = "text_received"
-    CONTEXTACTIONRECEIVED = "contextAction_received"
-    ACLRECEIVED = "acl_received"
-    PERMISSIONDENIED = "permission_denied"
-
-
-def set_callback(callback: Callbacks, callable: Callable):
-    pass
+    CHANNEL_CREATED = "channel_created"
+    CHANNEL_UPDATED = "channel_updated"
+    CHANNEL_REMOVED = "channel_remove"
+    USER_CREATED = "user_created"
+    USER_UPDATED = "user_updated"
+    USER_REMOVED = "user_removed"
+    SOUND_RECEIVED = "sound_received"
+    TEXT_MESSAGE_RECEIVED = "text_received"
+    CONTEXT_ACTION_RECEIVED = "contextAction_received"
+    ACL_RECEIVED = "acl_received"
+    PERMISSION_DENIED = "permission_denied"

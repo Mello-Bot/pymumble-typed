@@ -1,18 +1,14 @@
 from enum import Enum
 
 
-class Commands(Enum):
+class Command(Enum):
     MOVE = "move"
-    MODUSERSTATE = "update_user"
-    TEXTMESSAGE = "text_message"
-    TEXTPRIVATEMESSAGE = "text_private_message"
-    LINKCHANNEL = "link"
-    UNLINKCHANNEL = "unlink"
-    QUERYACL = "get_acl"
-    UPDATEACL = "update_acl"
-    REMOVEUSER = "remove_user"
-    UPDATECHANNEL = "update_channel"
-
-
-def set_command(command: Commands):
-    pass
+    MOD_USER_STATE = "update_user"
+    TEXT_MESSAGE = "text_message"
+    TEXT_PRIVATE_MESSAGE = "text_private_message"
+    LINK_CHANNEL = "link"
+    UNLINK_CHANNEL = "unlink"
+    QUERY_ACL = "get_acl"
+    UPDATE_ACL = "update_acl"
+    REMOVE_USER = "remove_user"
+    UPDATE_CHANNEL = "update_channel"
