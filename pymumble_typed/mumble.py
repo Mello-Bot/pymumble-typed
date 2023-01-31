@@ -134,8 +134,8 @@ class Mumble(Thread):
         self.sound_receive = False
         self.loop_rate = Mumble.LOOP_RATE
         self.application = Mumble.VERSION_STRING
-
-        self._callbacks = callbacks
+        self._requested_callbacks = callbacks
+        self._callbacks = Callbacks()
 
         self._ready_lock = Lock()
         self._ready_lock.acquire()
@@ -158,7 +158,7 @@ class Mumble(Thread):
         self.users: Users = Users(self, self._callbacks)
         self.channels: Channels = Channels(self, self._callbacks)
 
-        self.sound_output: SoundOutput | None = None
+        self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self.bandwidth, stereo=self.stereo)
         self.command_queue: CommandQueue = CommandQueue()
 
         self.receive_buffer = bytes()
@@ -188,11 +188,7 @@ class Mumble(Thread):
 
         self.users = Users(self, self._callbacks)
         self.channels = Channels(self, self._callbacks)
-        if self.sound_receive:
-            self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self.bandwidth, stereo=self.stereo)
-        else:
-            self.sound_output = None
-
+        self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self.bandwidth, stereo=self.stereo)
         self.command_queue = CommandQueue()
 
     def run(self):
@@ -412,8 +408,7 @@ class Mumble(Thread):
         elif _type == MessageType.CodecVersion:
             packet = CodecVersion()
             packet.ParseFromString(message)
-            if self.sound_output:
-                self.sound_output.set_default_codec(packet)
+            self.sound_output.set_default_codec(packet)
         elif _type == MessageType.UserStats:
             packet = UserStats()
             packet.ParseFromString(message)
