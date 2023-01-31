@@ -155,6 +155,9 @@ class Channels(dict[int, Channel]):
         self._mumble = mumble
         self._callbacks = callbacks
         self._lock = Lock()
+    
+    def current(self):
+        return self._mumble.users.myself.channel()
 
     def handle_update(self, packet: ChannelState):
         self._lock.acquire()

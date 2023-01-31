@@ -81,6 +81,9 @@ class User:
                 self._update_texture()
         return actions
 
+    def channel(self):
+        return self._mumble.channels[self.channel_id]
+
     def _update_comment(self):
         if not self._comment_hash:
             return
