@@ -280,8 +280,8 @@ class Mumble(Thread):
             if self.connected == Status.CONNECTED:
                 while self.command_queue.has_next():
                     self.treat_command(self.command_queue.pop())
-                if self.sound_output:  # FIXME: move to another loop
-                    self.sound_output.send_audio()
+
+                self.sound_output.send_audio()
 
             (rlist, wlist, xlist) = select([self.control_socket], [], [self.control_socket], self.loop_rate)
             if self.control_socket in rlist:
