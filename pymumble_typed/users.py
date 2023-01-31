@@ -214,7 +214,7 @@ class Users(dict[int, User]):
             user = self[packet.session]
             actor = self[packet.actor]
             actions = user.update(packet)
-            self._callbacks.on_user_update(user, actor, actions)
+            self._callbacks.on_user_updated(user, actor, actions)
         except KeyError:
             user = User(self._mumble, self._callbacks, packet)
             self[packet.session] = user
