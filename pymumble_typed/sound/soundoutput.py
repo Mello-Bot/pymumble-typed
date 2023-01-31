@@ -25,7 +25,7 @@ class SoundOutput:
         self._opus_profile: CodecProfile = profile
         self._encoder: Encoder | None = None
         self._encoder_framesize = None
-        self._codec = CodecVersion
+        self._codec = None
         self._bandwidth = mumble.bandwidth
         self._audio_per_packet = audio_per_packet
         self._channels = 1 if not stereo else 2
