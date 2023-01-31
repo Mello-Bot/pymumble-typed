@@ -43,8 +43,8 @@ class Channel:
             actions["id"] = packet.channel_id
             self.id = packet.channel_id
         if self.acl != packet.acl:
-            actions["acl"] = ACL()
-            self.acl = ACL()
+            actions["acl"] = ACL(self._mumble, self.id)
+            self.acl = actions["acl"]
         if self.name != packet.name:
             actions["name"] = packet.name
             self.name = packet.name
