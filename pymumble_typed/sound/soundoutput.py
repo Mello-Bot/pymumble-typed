@@ -13,6 +13,7 @@ from opuslib import OpusError, Encoder
 
 from pymumble_typed.commands import VoiceTarget
 from pymumble_typed.tools import VarInt
+from pymumble_typed.tools import VarInt
 
 from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, SEQUENCE_DURATION, \
     CodecNotSupportedError, CodecProfile
@@ -76,7 +77,7 @@ class SoundOutput:
 
                 audio_encoded += self._encoder_framesize
 
-                if self._codec == AudioType.OPUS:
+                if self._codec_type == AudioType.OPUS:
                     frame_header = VarInt(len(encoded)).encode()
                 else:
                     frame_header = len(encoded)
