@@ -215,12 +215,7 @@ class Mumble(Thread):
                     sleep(Mumble.CONNECTION_RETRY_INTERVAL)
             try:
                 self._logger.debug("Starting loop")
-                if self._loop_thread:
-                    if self._loop_thread.is_alive():
-                        self._loop_thread.join()
-                    self._loop_thread = Thread(target=self.loop)
-                self._loop_thread.start()
-                self._loop_thread.join()
+                self.loop()
             except socket.error:
                 self._logger.error("Error while executing loop", exc_info=True)
                 self.connected = Status.NOT_CONNECTED
