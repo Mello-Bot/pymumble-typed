@@ -176,6 +176,7 @@ class Mumble(Thread):
     def init_connection(self):
         self._first_connect = False
         self._ready_lock.acquire(False)
+        self._callbacks = Callbacks()
         self.ping = Ping(self)
         self.connected = Status.NOT_CONNECTED
 
@@ -350,6 +351,8 @@ class Mumble(Thread):
                 self.connected = Status.CONNECTED
                 self._ready_lock.release()
                 self._callbacks = self._requested_callbacks
+                self.users.set_callbacks(self._callbacks)
+                self.channels.set_callbacks(self._callbacks)
                 self._callbacks.on_connect()
         elif _type == MessageType.ChannelRemove:
             packet = ChannelRemove()

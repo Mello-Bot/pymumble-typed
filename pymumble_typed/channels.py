@@ -159,12 +159,16 @@ class Channel:
     def __lt__(self, other: Channel):
         return self.id < other.id
 
+
 class Channels(dict[int, Channel]):
     def __init__(self, mumble: Mumble, callbacks: Callbacks):
         super().__init__()
         self._mumble = mumble
         self._callbacks = callbacks
         self._lock = Lock()
+
+    def set_callbacks(self, callbacks: Callbacks):
+        self._callbacks = callbacks
 
     def current(self):
         return self._mumble.users.myself.channel()

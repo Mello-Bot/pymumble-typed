@@ -208,6 +208,9 @@ class Users(dict[int, User]):
         self._lock = Lock()
         self._callbacks = callbacks
 
+    def set_callbacks(self, callbacks: Callbacks):
+        self._callbacks = callbacks
+
     def handle_update(self, packet: UserState):
         self._lock.acquire()
         try:
