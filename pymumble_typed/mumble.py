@@ -167,7 +167,10 @@ class Mumble(Thread):
         self._first_connect = True
 
     def set_callbacks(self, callbacks: Callbacks):
-        self._callbacks = callbacks
+        if self.is_alive() and self.is_ready():
+            self._callbacks = callbacks
+        else:
+            self._requested_callbacks = callbacks
 
     def init_connection(self):
         self._first_connect = False
@@ -345,6 +348,7 @@ class Mumble(Thread):
             if self.connected is Status.AUTHENTICATING:
                 self.connected = Status.CONNECTED
                 self._ready_lock.release()
+                self._callbacks = self._requested_callbacks
                 self._callbacks.on_connect()
         elif _type == MessageType.ChannelRemove:
             packet = ChannelRemove()
