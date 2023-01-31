@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed import Mumble
+    from pymumble_typed.mumble import Mumble
     from pymumble_typed.callbacks import Callbacks
 from struct import unpack
 from threading import Lock
