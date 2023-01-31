@@ -168,7 +168,6 @@ class Mumble(Thread):
         self._first_connect = True
 
     def init_connection(self):
-        print("INIT")
         self._first_connect = False
         self._ready_lock.acquire(False)
         self.ping = Ping(self)
@@ -279,10 +278,8 @@ class Mumble(Thread):
             if self.control_socket in rlist:
                 self.read_control_messages()
             elif self.control_socket in xlist:
-                print("Disconnect from remote")
                 self.control_socket.close()
                 self.connected = Status.NOT_CONNECTED
-        print(self.connected, self._loop_thread.is_alive(), self.exit)
 
     def send_message(self, _type: MessageType, message: Message):
         if self._debug:
