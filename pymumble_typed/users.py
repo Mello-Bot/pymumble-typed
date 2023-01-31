@@ -63,8 +63,8 @@ class User:
             actions["deaf"] = packet.deaf
             self.deaf = packet.deaf
         if packet.HasField("self_deaf") and self.self_deaf != packet.self_deaf:
-            actions["self_deaf"] = packet.deaf
-            self.self_deaf = packet.deaf
+            actions["self_deaf"] = packet.self_deaf
+            self.self_deaf = packet.self_deaf
         if packet.HasField("suppress") and self.suppressed != packet.suppress:
             actions["suppress"] = packet.suppress
             self.suppressed = packet.suppress
