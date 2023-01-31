@@ -50,8 +50,8 @@ class SoundOutput:
             current_time = time()
             if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time:
                 self._sequence = 0
-                self._sequence_start_time = 0
-                self._sequence_last_time = 0
+                self._sequence_start_time = current_time
+                self._sequence_last_time = current_time
             elif self._sequence_last_time + (self._audio_per_packet * 2) <= current_time:
                 self._sequence = (current_time - self._sequence_start_time) // SEQUENCE_DURATION
                 self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
@@ -92,7 +92,6 @@ class SoundOutput:
                 udp_packet += pack("fff", self._mumble.positional[0], self._mumble.positional[1],
                                    self._mumble.positional[2])
             self._mumble.send_audio(udp_packet)
-
 
     def get_audio_per_packet(self):
         return self._audio_per_packet
