@@ -16,19 +16,19 @@ from pymumble_typed.commands import VoiceTarget
 from pymumble_typed.tools import VarInt
 
 from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, SEQUENCE_DURATION, \
-    CodecNotSupportedError
+    CodecNotSupportedError, CodecProfile
 from time import time
 
 
 class SoundOutput:
-    def __init__(self, mumble: Mumble, audio_per_packet: int, bandwidth: int, stereo=False, profile=AudioType.OPUS):
+    def __init__(self, mumble: Mumble, audio_per_packet: int, bandwidth: int, stereo=False, profile=CodecProfile.Audio):
         self._mumble = mumble
         self._pcm = []
         self._lock = Lock()
         self._codec = None
         self._encoder: Encoder | None = None
         self._encoder_framesize = None
-        self._opus_profile = profile
+        self._opus_profile: CodecProfile = profile
         self._channels = 1 if not stereo else 2
         self._bandwidth = mumble.bandwidth
         self._audio_per_packet = 0
