@@ -3,6 +3,8 @@ from __future__ import annotations
 from logging import Logger, ERROR, DEBUG
 from typing import TYPE_CHECKING
 
+from pymumble_typed import MessageType
+
 if TYPE_CHECKING:
     from ssl import SSLSocket
     from google.protobuf.message import Message
@@ -29,7 +31,7 @@ from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
 
 from enum import IntEnum
-from threading import Thread, current_thread, Lock
+from threading import Thread, Lock
 from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, AUDIO_PER_PACKET
 from time import time
 from select import select
@@ -43,36 +45,6 @@ class ConnectionRejectedError(Exception):
 
     def __str__(self):
         return repr(self.value)
-
-
-class MessageType(IntEnum):
-    Version = 0
-    UDPTunnel = 1
-    Authenticate = 2
-    PingPacket = 3
-    Reject = 4
-    ServerSync = 5
-    ChannelRemove = 6
-    ChannelState = 7
-    UserRemove = 8
-    UserState = 9
-    BanList = 10
-    TextMessage = 11
-    PermissionDenied = 12
-    ACL = 13
-    QueryUsers = 14
-    CryptSetup = 15
-    ContextActionModify = 16
-    ContextAction = 17
-    UserList = 18
-    VoiceTarget = 19
-    PermissionQuery = 20
-    CodecVersion = 21
-    UserStats = 22
-    RequestBlob = 23
-    ServerConfig = 24
-    SuggestConfig = 25
-
 
 class Status(IntEnum):
     NOT_CONNECTED = 0
@@ -95,12 +67,11 @@ class Ping:
         self.number = 1
         self.average = 0.
         self.variance = 0.
-        self.last = time()
+        self.last = 0
         self.client = client
 
     def send(self):
         if self.last + Ping.DELAY < time():
-            print("Send ping")
             ping = PingPacket()
             ping.timestamp = int(time())
             ping.tcp_ping_avg = self.average
@@ -114,7 +85,7 @@ class Ping:
             self.last = time()
 
     def receive(self, _: PingPacket):
-        print("Ping receive")
+        print("Pong")
         self.last_receive = int(time() * 1000)
         ping = self.last_receive - self.time_send
         old_average = self.average
@@ -145,8 +116,8 @@ class Mumble(Thread):
         if tokens is None:
             tokens = []
         self._debug = debug
-        self._parent_thread = current_thread()
-        self._mumble_thread: Thread | None = None
+        self._parent_thread = self
+        self._loop_thread = Thread(target=self.loop)
         self._logger = logger if logger else Logger("PyMumble-Typed")
         self._logger.setLevel(DEBUG if debug else ERROR)
         self.host = host
@@ -197,6 +168,7 @@ class Mumble(Thread):
         self._first_connect = True
 
     def init_connection(self):
+        print("INIT")
         self._first_connect = False
         self._ready_lock.acquire(False)
         self.ping = Ping(self)
@@ -223,22 +195,25 @@ class Mumble(Thread):
         self.command_queue = CommandQueue()
 
     def run(self):
-        self._mumble_thread = current_thread()
         while self.reconnect or self._first_connect:
             self.init_connection()
 
             if self.connect() >= Status.FAILED:
-                print("Connection failed")
                 self._ready_lock.release()
                 if not self.reconnect or not self._parent_thread.is_alive():
                     raise ConnectionRejectedError("Connection error with the Mumble (murmur) Server")
                 else:
                     sleep(Mumble.CONNECTION_RETRY_INTERVAL)
             try:
-                print("Starting loop")
                 self._logger.debug("Starting loop")
-                self.loop()
+                if self._loop_thread:
+                    if self._loop_thread.is_alive():
+                        self._loop_thread.join()
+                    self._loop_thread = Thread(target=self.loop)
+                self._loop_thread.start()
+                self._loop_thread.join()
             except socket.error:
+                self._logger.error("Error while executing loop", exc_info=True)
                 self.connected = Status.NOT_CONNECTED
 
             self._callbacks.on_disconnect()
@@ -253,6 +228,7 @@ class Mumble(Thread):
             sock.settimeout(10)
         except socket.error:
             self.connected = Status.FAILED
+            self._logger.error("Error while connecting", exc_info=True)
             return self.connected
 
         try:
@@ -283,6 +259,7 @@ class Mumble(Thread):
 
             self.send_message(MessageType.Authenticate, authenticate)
         except socket.error:
+            self._logger.error("Error while authenticating", exc_info=True)
             self.connected = Status.FAILED
             return self.connected
         self.connected = Status.AUTHENTICATING
@@ -290,8 +267,7 @@ class Mumble(Thread):
 
     def loop(self):
         self.exit = False
-
-        while self.connected not in (Status.NOT_CONNECTED, Status.FAILED) and self._parent_thread.is_alive() and not self.exit:
+        while self.connected not in (Status.NOT_CONNECTED, Status.FAILED) and self._loop_thread.is_alive() and not self.exit:
             self.ping.send()
             if self.connected == Status.CONNECTED:
                 while self.command_queue.has_next():
@@ -303,8 +279,10 @@ class Mumble(Thread):
             if self.control_socket in rlist:
                 self.read_control_messages()
             elif self.control_socket in xlist:
+                print("Disconnect from remote")
                 self.control_socket.close()
                 self.connected = Status.NOT_CONNECTED
+        print(self.connected, self._loop_thread.is_alive(), self.exit)
 
     def send_message(self, _type: MessageType, message: Message):
         if self._debug:
@@ -322,7 +300,8 @@ class Mumble(Thread):
             buffer: bytes = self.control_socket.recv(Mumble.READ_BUFFER_SIZE)
             self.receive_buffer += buffer
         except socket.error:
-            pass
+            self._logger.error("Error while reading control messages", exc_info=True)
+            return
 
         while len(self.receive_buffer) >= 6:
             header = self.receive_buffer[0:6]
@@ -455,7 +434,7 @@ class Mumble(Thread):
                     elif items[0] == 'image_message_length':
                         self.server_max_image_message_length = int(items[1].strip())
                 except:
-                    pass  # FIXME: log error
+                    self._logger.error(f"Error while parsing server arguments: {str(packet)}", exc_info=True)
 
     def set_bandwidth(self, bandwidth: int):
         if self.server_max_bandwidth is not None:
@@ -510,6 +489,7 @@ class Mumble(Thread):
 
                     sequence.value += int(round(sound.duration / 100))
                 except CodecNotSupportedError:
+                    self._logger.error("Codec not supported", exc_info=True)
                     pass  # FIXME: log it
                 except KeyError:
                     pass
@@ -534,18 +514,17 @@ class Mumble(Thread):
         self._ready_lock.acquire()
         self._ready_lock.release()
 
-    def execute_command(self, cmd: Command, blocking: bool = True):
+    def execute_command(self, cmd: Command, blocking: bool = False):
         self.is_ready()
-
         lock = self.command_queue.push(cmd)
-        if blocking and self._mumble_thread is not current_thread():
+        if blocking:
             lock.acquire()
             lock.release()
         return lock
 
     def treat_command(self, cmd: Command):
         if cmd.packet:
-            self.send_message(MessageType.UserState, cmd.packet)
+            self.send_message(cmd.type, cmd.packet)
             cmd.response = True
             self.command_queue.answer(cmd)
 
@@ -565,3 +544,13 @@ class Mumble(Thread):
 
     def request_blob(self, packet):
         self.send_message(MessageType.RequestBlob, packet)
+
+    def reauthenticate(self, token):
+        packet = Authenticate()
+        packet.username = self.user
+        packet.password = self.password
+        packet.tokens.extend(self.tokens)
+        packet.tokens.append(token)
+        packet.opus = True
+        packet.client_type = self.client_type
+        self.send_message(MessageType.Authenticate, packet)

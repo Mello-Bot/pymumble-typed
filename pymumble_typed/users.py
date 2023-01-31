@@ -53,10 +53,10 @@ class User:
         if self.priority_speaker != packet.priority_speaker:
             actions["priority_speaker"] = packet.priority_speaker
             self.priority_speaker = packet.priority_speaker
-        if self.muted != packet.muted:
+        if self.muted != packet.mute:
             actions["muted "] = packet.mute
             self.muted = packet.mute
-        if self.self_muted != packet.self_muted:
+        if self.self_muted != packet.self_mute:
             actions["self_muted "] = packet.self_mute
             self.self_muted = packet.self_mute
         if self.deaf != packet.deaf:
@@ -65,7 +65,7 @@ class User:
         if self.self_deaf != packet.self_deaf:
             actions["self_deaf "] = packet.deaf
             self.self_deaf = packet.deaf
-        if self.suppressed != packet.suppressed:
+        if self.suppressed != packet.suppress:
             actions["suppressed "] = packet.suppress
             self.suppressed = packet.suppress
 
@@ -147,14 +147,7 @@ class User:
 
     def move_in(self, channel: Channel, token: str = None):
         if token:
-            packet = Authenticate()
-            packet.username = self._mumble.user
-            packet.password = self._mumble.password
-            packet.tokens.extend(self._mumble.tokens)
-            packet.tokens.append(token)
-            packet.opus = True
-            packet.client_type = self._mumble.client_type
-            self._mumble.send_message(MessageType.Authenticate, packet)
+            self._mumble.reauthenticate(token)
         command = Move(self.session, channel.id)
         self._mumble.execute_command(command)
 
@@ -177,6 +170,22 @@ class User:
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
         self._mumble.execute_command(command)
 
+    def __str__(self):
+        return str({
+            "hash" : self.hash,
+            "session": self.session,
+            "name": self.name,
+            "priority_speaker": self.priority_speaker,
+            "channel_id": self.channel_id,
+            "muted": self.muted,
+            "self_muted": self.self_muted,
+            "deaf": self.deaf,
+            "self_deaf": self.self_deaf,
+            "suppressed": self.suppressed,
+            "comment": self.comment,
+            "texture": self.texture
+        })
+
 
 class Users(dict[int, User]):
     def __init__(self, mumble: Mumble, callbacks: Callbacks):
@@ -191,8 +200,9 @@ class Users(dict[int, User]):
         self._lock.acquire()
         try:
             user = self[packet.session]
+            actor = self[packet.actor]
             actions = user.update(packet)
-            self._callbacks.on_user_update(user, actions)
+            self._callbacks.on_user_update(user, actor, actions)
         except KeyError:
             user = User(self._mumble, self._callbacks, packet)
             self[packet.session] = user

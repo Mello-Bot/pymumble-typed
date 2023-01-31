@@ -33,4 +33,6 @@ class Message:
             self.channel: Channel | None = mumble.channels[message.channel_id.pop()]
         except KeyError:
             self.channel = None
+        except IndexError:
+            self.channel = None
         self.content: str = message.message

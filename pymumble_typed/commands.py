@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from google.protobuf.message import Message
     from pymumble_typed.mumble import Mumble
 
+from pymumble_typed import MessageType
 from collections import deque
 from threading import Lock
 
@@ -18,6 +19,7 @@ from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 class Command:
     def __init__(self):
         self.id = None
+        self.type: MessageType
         self.lock = Lock()
         self.response = None
         self.packet: Message | None = None
@@ -26,6 +28,7 @@ class Command:
 class Move(Command):
     def __init__(self, session: int, channel_id: int):
         super().__init__()
+        self.type = MessageType.UserState
         self.packet = UserState()
         self.packet.session = session
         self.packet.channel_id = channel_id
@@ -39,6 +42,7 @@ class TextMessage(Command):
                 raise TextTooLongError(len(message), mumble.get_max_message_length())
         elif len(message) > mumble.get_max_image_length():
             raise ImageTooBigError(len(message), mumble.get_max_image_length())
+        self.type = MessageType.TextMessage
         self.packet = TextMessagePacket()
         self.packet.session.append(session)
         self.packet.channel_id.append(channel_id)
@@ -53,9 +57,10 @@ class TextPrivateMessage(Command):
                 raise TextTooLongError(len(message), mumble.get_max_message_length())
         elif len(message) > mumble.get_max_image_length():
             raise ImageTooBigError(len(message), mumble.get_max_image_length())
+        self.type = MessageType.TextMessage
         self.packet = TextMessagePacket()
         self.packet.session.append(session)
-        self.packet.message.append(message)
+        self.packet.message = message
 
 
 class ModUserState(Command):
@@ -65,6 +70,7 @@ class ModUserState(Command):
                  plugin_context: bytes | None = None, listening_channel_add: list[int] | None = None,
                  listening_channel_remove: list[int] | None = None):
         super().__init__()
+        self.type = MessageType.UserState
         self.packet = UserState()
         self.packet.session = session
 
@@ -97,6 +103,7 @@ class ModUserState(Command):
 class RemoveUser(Command):
     def __init__(self, session: int, reason: str | None, ban: bool | None):
         super().__init__()
+        self.type = MessageType.UserRemove
         self.packet = UserRemove()
         self.packet.session = session
         self.packet.reason = reason
@@ -106,6 +113,7 @@ class RemoveUser(Command):
 class CreateChannel(Command):
     def __init__(self, parent: int, name: str, temporary: bool):
         super().__init__()
+        self.type = MessageType.ChannelState
         self.packet = ChannelState()
         self.packet.parent = parent
         self.packet.name = name
@@ -115,6 +123,7 @@ class CreateChannel(Command):
 class RemoveChannel(Command):
     def __init__(self, channel_id: int):
         super().__init__()
+        self.type = MessageType.ChannelRemove
         self.packet = ChannelRemove()
         self.packet.channel_id = channel_id
 
@@ -123,6 +132,7 @@ class UpdateChannel(Command):
     def __init__(self, channel_id: int, name: str | None = None, parent: int | None = None, position: int | None = None,
                  max_users: int | None = None, description: str | None = None):
         super().__init__()
+        self.type = MessageType.ChannelState
         self.packet = ChannelState()
         self.packet.channel_id = channel_id
         self.packet.name = name
@@ -135,6 +145,7 @@ class UpdateChannel(Command):
 class VoiceTarget(Command):
     def __init__(self, voice_id: int, targets: list[int]):
         super().__init__()
+        self.type = MessageType.VoiceTarget
         self.packet = VoiceTargetPacket()
         self.packet.id = voice_id
         _targets: list[VoiceTargetPacket.Target] = []
@@ -153,6 +164,7 @@ class VoiceTarget(Command):
 class LinkChannel(Command):
     def __init__(self, channel_id: int, add_ids: list[int]):
         super().__init__()
+        self.type = MessageType.ChannelState
         self.packet = ChannelState()
         self.packet.channel_id = channel_id
         self.packet.links_add.extend(add_ids)
@@ -162,6 +174,7 @@ class UnlinkChannel(Command):
     # FIXME
     def __init__(self, channel_id: int, remove_ids: list[int]):
         super().__init__()
+        self.type = MessageType.ChannelState
         self.packet = ChannelState()
         self.packet.channel_id = channel_id
         self.packet.links_remove.extend(remove_ids)
@@ -170,6 +183,7 @@ class UnlinkChannel(Command):
 class QueryACL(Command):
     def __init__(self, channel_id: int):
         super().__init__()
+        self.type = MessageType.ACL
         self.packet = ACL()
         self.packet.channel_id = channel_id
         self.packet.query = True
@@ -202,7 +216,7 @@ class ChannelACL:
 class UpdateACL(Command):
     def __init__(self, channel_id: int, inherit_acls, chan_group: list[ChannelGroup], chan_acl: list[ChannelACL]):
         super().__init__()
-
+        self.type = MessageType.ACL
         self.packet = ACL()
         self.packet.channel_id = channel_id
         self.packet.inherit_acls = inherit_acls

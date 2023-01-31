@@ -28,7 +28,7 @@ class Callbacks:
     def on_user_created(self, user: User):
         pass
 
-    def on_user_update(self, user: User, actions: dict):
+    def on_user_update(self, user: User, actor: User, actions: dict):
         pass
 
     def on_user_removed(self, user: User, actor: User, ban: bool, reason: str):
