@@ -95,7 +95,7 @@ class Channel:
     def get_users(self) -> list[User]:
         return list([user for user in self._mumble.users.values() if user.channel_id == self.id])
 
-    def move_in(self, user: User | None):
+    def move_in(self, user: User | None = None):
         if user is None:
             user = self._mumble.users.myself
         command = Move(user.session, self.id)
