@@ -553,3 +553,12 @@ class Mumble(Thread):
         packet.opus = True
         packet.client_type = self.client_type
         self.send_message(MessageType.Authenticate, packet)
+
+    def send_audio(self, udp_packet):
+        tcp_packet = pack('!HL', MessageType.UDPTunnel, len(udp_packet)) + udp_packet
+
+        while len(tcp_packet) > 0:
+            sent = self.control_socket.send(tcp_packet)
+            if sent < 0:
+                raise socket.error("Server socket error while sending audio")
+            tcp_packet = tcp_packet[sent:]

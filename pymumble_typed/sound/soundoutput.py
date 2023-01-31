@@ -4,9 +4,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pymumble_typed.Mumble_pb2 import CodecVersion
-    from pymumble_typed.mumble import Mumble, MessageType
+    from pymumble_typed.mumble import Mumble
 
-from socket import error
 from struct import pack
 from threading import Lock
 
@@ -91,13 +90,8 @@ class SoundOutput:
             if self._mumble.positional:
                 udp_packet += pack("fff", self._mumble.positional[0], self._mumble.positional[1],
                                    self._mumble.positional[2])
-            tcp_packet = pack('!HL', MessageType.UDPTunnel, len(udp_packet)) + udp_packet
+            self._mumble.send_audio(udp_packet)
 
-            while len(tcp_packet) > 0:
-                sent = self._mumble.control_socket.send(tcp_packet)
-                if sent < 0:
-                    raise error("Server socket error while sending audio")
-                tcp_packet = tcp_packet[sent:]
 
     def get_audio_per_packet(self):
         return self._audio_per_packet
