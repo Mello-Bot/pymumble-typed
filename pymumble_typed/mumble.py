@@ -562,7 +562,7 @@ class Mumble(Thread):
         self.send_message(MessageType.Authenticate, packet)
 
     def send_audio(self, udp_packet):
-        tcp_packet = pack('!HL', MessageType.UDPTunnel, len(udp_packet)) + udp_packet
+        tcp_packet = pack('!HL', MessageType.UDPTunnel.value, len(udp_packet)) + udp_packet
 
         while len(tcp_packet) > 0:
             sent = self.control_socket.send(tcp_packet)
