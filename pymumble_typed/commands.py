@@ -46,7 +46,7 @@ class ModUserState(Command):
     def __init__(self, session: int, mute: bool | None = None, self_mute: bool | None = None, deaf: bool | None = None,
                  self_deaf: bool | None = None, suppress: bool | None = None, recording: bool | None = None,
                  comment: str | None = None, texture: str | None = None, user_id: int | None = None,
-                 plugin_context: int | None = None, listening_channel_add: list[int] | None = None,
+                 plugin_context: bytes | None = None, listening_channel_add: list[int] | None = None,
                  listening_channel_remove: list[int] | None = None):
         super().__init__()
         self.packet = UserState()
