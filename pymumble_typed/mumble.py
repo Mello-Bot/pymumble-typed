@@ -85,7 +85,6 @@ class Ping:
             self.last = time()
 
     def receive(self, _: PingPacket):
-        print("Pong")
         self.last_receive = int(time() * 1000)
         ping = self.last_receive - self.time_send
         old_average = self.average
