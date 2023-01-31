@@ -1,6 +1,5 @@
 from enum import IntEnum
 
-
 class Message(IntEnum):
     VERSION = 0
     UDP_TUNNEL = 1

@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 
 class AudioType(IntEnum):
@@ -7,4 +7,9 @@ class AudioType(IntEnum):
     SPEEX = 2
     CELT_BETA = 3
     OPUS = 4
-    OPUS_PROFILE = "audio"  # "voip"
+
+
+class CodecProfile(str, Enum):
+    Audio = "audio"
+    Voip = "voip"
+    RestrictedLowDelay = "restricted_lowdelay"
