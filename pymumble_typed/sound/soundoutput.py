@@ -123,7 +123,7 @@ class SoundOutput:
                 overhead_per_packet += 20  # TCP Header
                 overhead_per_packet += 6  # TCPTunnel Encapsulation
             overhead_per_second = (overhead_per_packet * 8) // self._audio_per_packet
-            self._encoder.bitrate = self._bandwidth - overhead_per_second
+            self._encoder.bitrate = int(self._bandwidth - overhead_per_second)
 
     def add_sound(self, pcm: bytes):
         if len(pcm) % 2 != 0:
