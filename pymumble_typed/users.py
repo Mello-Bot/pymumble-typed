@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from struct import unpack
 from threading import Lock
 
-from pymumble_typed.Mumble_pb2 import UserState, UserRemove, RequestBlob, Authenticate
+from pymumble_typed.Mumble_pb2 import UserState, UserRemove, RequestBlob
 
 from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser
 
@@ -200,16 +200,12 @@ class User:
 
 
 class Users(dict[int, User]):
-    def __init__(self, mumble: Mumble, callbacks: Callbacks):
+    def __init__(self, mumble: Mumble):
         super().__init__()
         self.myself: User | None = None
         self._mumble = mumble
         self._myself_session = None
         self._lock = Lock()
-        self._callbacks = callbacks
-
-    def set_callbacks(self, callbacks: Callbacks):
-        self._callbacks = callbacks
 
     def handle_update(self, packet: UserState):
         self._lock.acquire()
@@ -217,12 +213,12 @@ class Users(dict[int, User]):
             user = self[packet.session]
             actor = self[packet.actor]
             actions = user.update(packet)
-            self._callbacks.on_user_updated(user, actor, actions)
+            self._mumble.callbacks.on_user_updated(user, actor, actions)
         except KeyError:
-            user = User(self._mumble, self._callbacks, packet)
+            user = User(self._mumble, self._mumble.callbacks, packet)
             self[packet.session] = user
             if packet.session != self._myself_session:
-                self._callbacks.on_user_created(user)
+                self._mumble.callbacks.on_user_created(user)
             else:
                 self.myself = user
         self._lock.release()
@@ -233,7 +229,7 @@ class Users(dict[int, User]):
             user = self[packet.session]
             actor = self[packet.actor]
             del self[packet.session]
-            self._callbacks.on_user_removed(user, actor, packet.ban, packet.reason)
+            self._mumble.callbacks.on_user_removed(user, actor, packet.ban, packet.reason)
         except KeyError:
             pass
         self._lock.release()

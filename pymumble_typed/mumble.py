@@ -46,6 +46,7 @@ class ConnectionRejectedError(Exception):
     def __str__(self):
         return repr(self.value)
 
+
 class Status(IntEnum):
     NOT_CONNECTED = 0
     AUTHENTICATING = 1
@@ -155,8 +156,8 @@ class Mumble(Thread):
         self.server_max_message_length = 5000
         self.server_max_image_message_length = 131072
 
-        self.users: Users = Users(self, self._callbacks)
-        self.channels: Channels = Channels(self, self._callbacks)
+        self.users: Users = Users(self)
+        self.channels: Channels = Channels(self)
 
         self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self.bandwidth, stereo=self.stereo)
         self.command_queue: CommandQueue = CommandQueue()
@@ -166,12 +167,14 @@ class Mumble(Thread):
         self.exit = False
         self._first_connect = True
 
+    @property
+    def callbacks(self):
+        return self._callbacks
+
     def set_callbacks(self, callbacks: Callbacks):
         if self.is_alive():
             self.is_ready()
             self._callbacks = callbacks
-            self.users.set_callbacks(self._callbacks)
-            self.channels.set_callbacks(self._callbacks)
         else:
             self._requested_callbacks = callbacks
 
@@ -193,8 +196,8 @@ class Mumble(Thread):
         self.server_max_message_length = 5000
         self.server_max_image_message_length = 131072
 
-        self.users = Users(self, self._callbacks)
-        self.channels = Channels(self, self._callbacks)
+        self.users = Users(self)
+        self.channels = Channels(self)
         self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self.bandwidth, stereo=self.stereo)
         self.command_queue = CommandQueue()
 
@@ -271,7 +274,8 @@ class Mumble(Thread):
 
     def loop(self):
         self.exit = False
-        while self.connected not in (Status.NOT_CONNECTED, Status.FAILED) and self._loop_thread.is_alive() and not self.exit:
+        while self.connected not in (
+        Status.NOT_CONNECTED, Status.FAILED) and self._loop_thread.is_alive() and not self.exit:
             self.ping.send()
             if self.connected == Status.CONNECTED:
                 while self.command_queue.has_next():
@@ -353,8 +357,6 @@ class Mumble(Thread):
                 self.connected = Status.CONNECTED
                 self._ready_lock.release()
                 self._callbacks = self._requested_callbacks
-                self.users.set_callbacks(self._callbacks)
-                self.channels.set_callbacks(self._callbacks)
                 self._callbacks.on_connect()
         elif _type == MessageType.ChannelRemove:
             packet = ChannelRemove()
