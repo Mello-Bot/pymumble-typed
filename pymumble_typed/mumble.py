@@ -31,7 +31,7 @@ from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
 
 from enum import IntEnum
-from threading import Thread, Lock
+from threading import Thread, Lock, current_thread
 from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, AUDIO_PER_PACKET
 from time import time
 from select import select
@@ -116,8 +116,8 @@ class Mumble(Thread):
         if tokens is None:
             tokens = []
         self._debug = debug
-        self._parent_thread = self
-        self._loop_thread = Thread(target=self.loop)
+        self._parent_thread = current_thread()
+        self._mumble_thread = None
         self._logger = logger if logger else Logger("PyMumble-Typed")
         self._logger.setLevel(DEBUG if debug else ERROR)
         self.host = host
@@ -202,7 +202,9 @@ class Mumble(Thread):
         self.command_queue = CommandQueue()
 
     def run(self):
-        while self.reconnect or self._first_connect:
+        self._mumble_thread = current_thread()
+
+        while self.reconnect or self._first_connect or self._parent_thread.is_alive():
             self.init_connection()
 
             if self.connect() >= Status.FAILED:
@@ -520,10 +522,10 @@ class Mumble(Thread):
         self._ready_lock.acquire()
         self._ready_lock.release()
 
-    def execute_command(self, cmd: Command, blocking: bool = False):
+    def execute_command(self, cmd: Command, blocking: bool = True):
         self.is_ready()
         lock = self.command_queue.push(cmd)
-        if blocking:
+        if blocking and self._mumble_thread is not current_thread():
             lock.acquire()
             lock.release()
         return lock
