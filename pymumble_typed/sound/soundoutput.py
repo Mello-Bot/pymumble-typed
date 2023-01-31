@@ -75,7 +75,7 @@ class SoundOutput:
                 except OpusError:
                     encoded = b''
 
-                audio_encoded += encoded
+                audio_encoded += self._encoder_framesize
 
                 if self._codec == AudioType.OPUS:
                     frame_header = VarInt(len(encoded)).encode()
