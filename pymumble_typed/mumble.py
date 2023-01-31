@@ -166,6 +166,9 @@ class Mumble(Thread):
         self.exit = False
         self._first_connect = True
 
+    def set_callbacks(self, callbacks: Callbacks):
+        self._callbacks = callbacks
+
     def init_connection(self):
         self._first_connect = False
         self._ready_lock.acquire(False)
