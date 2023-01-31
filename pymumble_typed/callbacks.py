@@ -27,7 +27,7 @@ class Callbacks:
     def on_user_update(self, user: User, actions: dict):
         pass
 
-    def on_user_removed(self, user: User, ban: bool, reason: str):
+    def on_user_removed(self, user: User, actor: User, ban: bool, reason: str):
         pass
 
     def on_sound_received(self, user: User, chunk: bytes):
