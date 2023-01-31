@@ -13,7 +13,6 @@ from opuslib import OpusError, Encoder
 
 from pymumble_typed.commands import VoiceTarget
 from pymumble_typed.tools import VarInt
-from pymumble_typed.tools import VarInt
 
 from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, SEQUENCE_DURATION, \
     CodecNotSupportedError, CodecProfile
@@ -23,6 +22,10 @@ from time import time
 class SoundOutput:
     def __init__(self, mumble: Mumble, audio_per_packet: int, bandwidth: int, stereo=False, profile=CodecProfile.Audio):
         self._mumble = mumble
+        self._bandwidth = mumble.bandwidth
+        self._audio_per_packet = audio_per_packet
+        self.set_audio_per_packet(audio_per_packet)
+        self.set_bandwidth(bandwidth)
         self._pcm = []
         self._lock = Lock()
         self._codec = None
@@ -30,10 +33,6 @@ class SoundOutput:
         self._encoder_framesize = None
         self._opus_profile: CodecProfile = profile
         self._channels = 1 if not stereo else 2
-        self._bandwidth = mumble.bandwidth
-        self._audio_per_packet = 0
-        self.set_audio_per_packet(audio_per_packet)
-        self.set_bandwidth(bandwidth)
         self._codec_type = None
         self._target = 0
         self._sequence_start_time = 0
@@ -110,14 +109,14 @@ class SoundOutput:
     def _set_bandwidth(self):
         if self._encoder:
             overhead_per_packet = 20
-            overhead_per_packet += int(3 * (self._audio_per_packet / self._encoder_framesize))
+            overhead_per_packet += (3 * int(self._audio_per_packet / self._encoder_framesize))
             if self._mumble.udp_active:
                 overhead_per_packet += 12
             else:
                 overhead_per_packet += 20  # TCP Header
                 overhead_per_packet += 6  # TCPTunnel Encapsulation
-            overhead_per_second = int((overhead_per_packet * 8) / self._audio_per_packet)
-            self._encoder.bitrate = int(self._bandwidth - overhead_per_second)
+            overhead_per_second = int(overhead_per_packet * 8 / self._audio_per_packet)
+            self._encoder.bitrate = self._bandwidth - overhead_per_second
 
     def add_sound(self, pcm: bytes):
         if len(pcm) % 2 != 0:
@@ -127,6 +126,7 @@ class SoundOutput:
         self._lock.acquire()
         if len(self._pcm) and len(self._pcm[-1]) < samples:
             initial_offset = samples - len(self._pcm[-1])
+            self._pcm[-1] += pcm[:initial_offset]
         else:
             initial_offset = 0
         for i in range(initial_offset, len(pcm), samples):
