@@ -87,10 +87,12 @@ class Channel:
         packet.channel_description.extend(unpack("!5I", self._description_hash))
         self._mumble.request_blob(packet)
 
-
     @property
-    def parent(self) -> Channel:
-        return self._mumble.channels[self._parent]
+    def parent(self) -> Channel | None:
+        try:
+            return self._mumble.channels[self._parent]
+        except KeyError:
+            return None
 
     def get_users(self) -> list[User]:
         return list([user for user in self._mumble.users.values() if user.channel_id == self.id])
