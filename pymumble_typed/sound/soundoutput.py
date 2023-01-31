@@ -53,10 +53,10 @@ class SoundOutput:
                 self._sequence_start_time = current_time
                 self._sequence_last_time = current_time
             elif self._sequence_last_time + (self._audio_per_packet * 2) <= current_time:
-                self._sequence = (current_time - self._sequence_start_time) // SEQUENCE_DURATION
+                self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
                 self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
             else:
-                self._sequence += self._audio_per_packet // SEQUENCE_DURATION
+                self._sequence += int(self._audio_per_packet / SEQUENCE_DURATION)
                 self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
             payload = bytearray()
@@ -71,7 +71,7 @@ class SoundOutput:
                     to_encode += b'\x00' * (samples - len(to_encode))
 
                 try:
-                    encoded = self._encoder.encode(to_encode, len(to_encode) // (2 * self._channels))
+                    encoded = self._encoder.encode(to_encode, int(len(to_encode) / (2 * self._channels)))
                 except OpusError:
                     encoded = b''
 
@@ -110,13 +110,13 @@ class SoundOutput:
     def _set_bandwidth(self):
         if self._encoder:
             overhead_per_packet = 20
-            overhead_per_packet += (3 * (self._audio_per_packet // self._encoder_framesize))
+            overhead_per_packet += int(3 * (self._audio_per_packet / self._encoder_framesize))
             if self._mumble.udp_active:
                 overhead_per_packet += 12
             else:
                 overhead_per_packet += 20  # TCP Header
                 overhead_per_packet += 6  # TCPTunnel Encapsulation
-            overhead_per_second = (overhead_per_packet * 8) // self._audio_per_packet
+            overhead_per_second = int((overhead_per_packet * 8) / self._audio_per_packet)
             self._encoder.bitrate = int(self._bandwidth - overhead_per_second)
 
     def add_sound(self, pcm: bytes):
