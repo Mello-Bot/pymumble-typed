@@ -22,18 +22,20 @@ from time import time
 class SoundOutput:
     def __init__(self, mumble: Mumble, audio_per_packet: int, bandwidth: int, stereo=False, profile=CodecProfile.Audio):
         self._mumble = mumble
-        self._bandwidth = mumble.bandwidth
-        self._audio_per_packet = audio_per_packet
-        self.set_audio_per_packet(audio_per_packet)
-        self.set_bandwidth(bandwidth)
-        self._pcm = []
-        self._lock = Lock()
-        self._codec = None
+        self._opus_profile: CodecProfile = profile
         self._encoder: Encoder | None = None
         self._encoder_framesize = None
-        self._opus_profile: CodecProfile = profile
+        self._codec = CodecVersion
+        self._bandwidth = mumble.bandwidth
+        self._audio_per_packet = audio_per_packet
         self._channels = 1 if not stereo else 2
-        self._codec_type = None
+        self._codec_type = AudioType.OPUS
+
+        self.set_audio_per_packet(audio_per_packet)
+        self.set_bandwidth(bandwidth)
+
+        self._pcm = []
+        self._lock = Lock()
         self._target = 0
         self._sequence_start_time = 0
         self._sequence_last_time = 0
