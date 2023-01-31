@@ -54,19 +54,19 @@ class User:
             actions["priority_speaker"] = packet.priority_speaker
             self.priority_speaker = packet.priority_speaker
         if self.muted != packet.mute:
-            actions["muted "] = packet.mute
+            actions["mute"] = packet.mute
             self.muted = packet.mute
         if self.self_muted != packet.self_mute:
-            actions["self_muted "] = packet.self_mute
+            actions["self_mute"] = packet.self_mute
             self.self_muted = packet.self_mute
         if self.deaf != packet.deaf:
-            actions["deaf "] = packet.deaf
+            actions["deaf"] = packet.deaf
             self.deaf = packet.deaf
         if self.self_deaf != packet.self_deaf:
-            actions["self_deaf "] = packet.deaf
+            actions["self_deaf"] = packet.deaf
             self.self_deaf = packet.deaf
         if self.suppressed != packet.suppress:
-            actions["suppressed "] = packet.suppress
+            actions["suppress"] = packet.suppress
             self.suppressed = packet.suppress
 
         if packet.HasField("comment_hash"):

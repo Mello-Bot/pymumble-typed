@@ -49,7 +49,7 @@ class Channel:
             actions["name"] = packet.name
             self.name = packet.name
         if self._parent != packet.parent:
-            actions["_parent"] = packet.parent
+            actions["parent"] = packet.parent
             self._parent = packet.parent
         if self.description != packet.description:
             actions["description"] = ""
