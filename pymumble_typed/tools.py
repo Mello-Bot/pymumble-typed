@@ -14,7 +14,7 @@ class InvalidVarInt(Exception):
 class VarInt:
     """Implement the varint type used in mumble"""
     def __init__(self, value=0):
-        self.value = value
+        self.value = int(value)
         
     def encode(self):
         """Encode an integer in the VarInt format, returning a binary string"""
