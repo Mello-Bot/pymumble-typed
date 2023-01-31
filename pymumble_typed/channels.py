@@ -148,6 +148,14 @@ class Channel:
     def update_acl(self, packet):
         self.acl.update(packet)
 
+    def __eq__(self, other: Channel):
+        return self.id == other.id
+
+    def __gt__(self, other: Channel):
+        return self.id > other.id
+
+    def __lt__(self, other: Channel):
+        return self.id < other.id
 
 class Channels(dict[int, Channel]):
     def __init__(self, mumble: Mumble, callbacks: Callbacks):
@@ -155,7 +163,7 @@ class Channels(dict[int, Channel]):
         self._mumble = mumble
         self._callbacks = callbacks
         self._lock = Lock()
-    
+
     def current(self):
         return self._mumble.users.myself.channel()
 

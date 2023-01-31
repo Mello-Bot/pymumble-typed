@@ -173,6 +173,15 @@ class User:
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
         self._mumble.execute_command(command)
 
+    def __eq__(self, other: User):
+        return self.hash == other.hash
+
+    def __gt__(self, other: User):
+        return self.session > other.session
+
+    def __lt__(self, other: User):
+        return self.session < other.session
+
     def __str__(self):
         return str({
             "hash" : self.hash,
