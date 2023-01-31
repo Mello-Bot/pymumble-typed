@@ -39,37 +39,31 @@ class Channel:
     def update(self, packet: ChannelState):
         actions = {}
 
-        if self.id != packet.id:
+        if packet.HasField("channel_id") and self.id != packet.channel_id:
             actions["id"] = packet.channel_id
             self.id = packet.channel_id
-        if self.acl != packet.acl:
-            actions["acl"] = ACL(self._mumble, self.id)
-            self.acl = actions["acl"]
-        if self.name != packet.name:
+        if packet.HasField("name") and self.name != packet.name:
             actions["name"] = packet.name
             self.name = packet.name
-        if self._parent != packet.parent:
+        if packet.HasField("parent") and self._parent != packet.parent:
             actions["parent"] = packet.parent
             self._parent = packet.parent
-        if self.description != packet.description:
-            actions["description"] = ""
-            self.description = ""
-        if self.temporary != packet.temporary:
+        if packet.HasField("temporary") and self.temporary != packet.temporary:
             actions["temporary"] = packet.temporary
             self.temporary = packet.temporary
-        if self.position != packet.position:
+        if packet.HasField("position") and self.position != packet.position:
             actions["position"] = packet.position
             self.position = packet.position
-        if self.max_users != packet.max_users:
+        if packet.HasField("max_users") and self.max_users != packet.max_users:
             actions["max_users"] = packet.max_users
             self.max_users = packet.max_users
-        if self.can_enter != packet.can_enter:
+        if packet.HasField("can_enter") and self.can_enter != packet.can_enter:
             actions["can_enter"] = packet.can_enter
             self.can_enter = packet.can_enter
-        if self.is_enter_restricted != packet.is_enter_restricted:
+        if packet.HasField("is_enter_restricted") and self.is_enter_restricted != packet.is_enter_restricted:
             actions["is_enter_restricted"] = packet.is_enter_restricted
             self.is_enter_restricted = packet.is_enter_restricted
-        if self.links != packet.links:
+        if packet.HasExtension("links") and self.links != packet.links:
             actions["links"] = packet.links
             self.links = packet.links
         if packet.HasField("description_hash"):
