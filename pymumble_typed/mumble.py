@@ -272,7 +272,7 @@ class Mumble(Thread):
     def loop(self):
         self.exit = False
         while self.connected not in (
-        Status.NOT_CONNECTED, Status.FAILED) and self._loop_thread.is_alive() and not self.exit:
+                Status.NOT_CONNECTED, Status.FAILED) and self._parent_thread.is_alive() and not self.exit:
             self.ping.send()
             if self.connected == Status.CONNECTED:
                 while self.command_queue.has_next():
