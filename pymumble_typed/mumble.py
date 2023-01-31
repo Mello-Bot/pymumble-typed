@@ -170,6 +170,8 @@ class Mumble(Thread):
         if self.is_alive():
             self.is_ready()
             self._callbacks = callbacks
+            self.users.set_callbacks(self._callbacks)
+            self.channels.set_callbacks(self._callbacks)
         else:
             self._requested_callbacks = callbacks
 
