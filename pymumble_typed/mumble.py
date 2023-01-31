@@ -167,7 +167,8 @@ class Mumble(Thread):
         self._first_connect = True
 
     def set_callbacks(self, callbacks: Callbacks):
-        if self.is_alive() and self.is_ready():
+        if self.is_alive():
+            self.is_ready()
             self._callbacks = callbacks
         else:
             self._requested_callbacks = callbacks
