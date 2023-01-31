@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.protobuf.message import Message
+    from pymumble_typed.mumble import Mumble
+
 from collections import deque
 from threading import Lock
 
-from google.protobuf.message import Message
-
 from pymumble_typed.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, ChannelRemove, \
     VoiceTarget as VoiceTargetPacket, UserRemove, ACL
+
+from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 
 
 class Command:
@@ -26,8 +32,13 @@ class Move(Command):
 
 
 class TextMessage(Command):
-    def __init__(self, session: int, channel_id: int, message: str):
+    def __init__(self, mumble: Mumble, session: int, channel_id: int, message: str):
         super().__init__()
+        if not ("<img" in message and "src" in message):
+            if len(message) > mumble.get_max_message_length():
+                raise TextTooLongError(len(message), mumble.get_max_message_length())
+        elif len(message) > mumble.get_max_image_length():
+            raise ImageTooBigError(len(message), mumble.get_max_image_length())
         self.packet = TextMessagePacket()
         self.packet.session.append(session)
         self.packet.channel_id.append(channel_id)
@@ -35,8 +46,13 @@ class TextMessage(Command):
 
 
 class TextPrivateMessage(Command):
-    def __init__(self, session: int, message: str):
+    def __init__(self, mumble: Mumble, session: int, message: str):
         super().__init__()
+        if not ("<img" in message and "src" in message):
+            if len(message) > mumble.get_max_message_length():
+                raise TextTooLongError(len(message), mumble.get_max_message_length())
+        elif len(message) > mumble.get_max_image_length():
+            raise ImageTooBigError(len(message), mumble.get_max_image_length())
         self.packet = TextMessagePacket()
         self.packet.session.append(session)
         self.packet.message.append(message)
@@ -104,11 +120,16 @@ class RemoveChannel(Command):
 
 
 class UpdateChannel(Command):
-    # FIXME
-    def __init__(self, TODO: str):
+    def __init__(self, channel_id: int, name: str | None = None, parent: int | None = None, position: int | None = None,
+                 max_users: int | None = None, description: str | None = None):
         super().__init__()
         self.packet = ChannelState()
-        # FIXME: set key, values
+        self.packet.channel_id = channel_id
+        self.packet.name = name
+        self.packet.parent = parent
+        self.packet.position = position
+        self.packet.max_users = max_users
+        self.packet.description = description
 
 
 class VoiceTarget(Command):
@@ -248,5 +269,3 @@ class CommandQueue:
 
     def answer(self, cmd: Command):
         cmd.lock.release()
-
-

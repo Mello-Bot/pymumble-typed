@@ -1,28 +1,36 @@
-from enum import IntEnum
+from __future__ import annotations
 
-class Message(IntEnum):
-    VERSION = 0
-    UDP_TUNNEL = 1
-    AUTHENTICATE = 2
-    PING = 3
-    REJECT = 4
-    SERVER_SYNC = 5
-    CHANNEL_REMOVE = 6
-    CHANNEL_STATE = 7
-    USER_REMOVE = 8
-    USER_STATE = 9
-    BAN_LIST = 10
-    TEXT_MESSAGE = 11
-    PERMISSION_DENIED = 12
-    ACL = 13
-    QUERY_USERS = 14
-    CRYPT_SETUP = 15
-    CONTEXT_ACTION_MODIFY = 16
-    CONTEXT_ACTION = 17
-    USER_LIST = 18
-    VOICE_TARGET = 19
-    PERMISSION_QUERY = 20
-    CODEC_VERSION = 21
-    USER_STATS = 22
-    REQUEST_BLOB = 23
-    SERVER_CONFIG = 24
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pymumble_typed.mumble import Mumble
+    from pymumble_typed.users import User
+    from pymumble_typed.channels import Channel
+    from pymumble_typed.Mumble_pb2 import TextMessage
+
+
+class TextTooLongError(Exception):
+    def __init__(self, current: int, max_value: int):
+        self._current = current
+        self._max_value = max_value
+
+    def __str__(self):
+        return f"Current Text length: {self._current}\nMax Text Length: {self._max_value}"
+
+
+class ImageTooBigError(TextTooLongError):
+    def __init__(self, current: int, max_value: int):
+        super().__init__(current, max_value)
+
+
+class Message:
+    def __init__(self, mumble: Mumble, message: TextMessage):
+        try:
+            self.author: User | None = mumble.users[message.actor]
+        except KeyError:
+            self.author = None
+        try:
+            self.channel: Channel | None = mumble.channels[message.channel_id.pop()]
+        except KeyError:
+            self.channel = None
+        self.content: str = message.message

@@ -2,66 +2,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pymumble_typed.channels import Channel
+from pymumble_typed.sound.soundqueue import SoundQueue
+
 if TYPE_CHECKING:
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.callbacks import Callbacks
+
 from struct import unpack
 from threading import Lock
 
 from pymumble_typed.Mumble_pb2 import UserState, UserRemove, RequestBlob, Authenticate
 
 from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser
-from pymumble_typed.mumble import MessageType
-
-
-class Users(dict):
-    def __init__(self, mumble: Mumble, callbacks: Callbacks):
-        super().__init__()
-        self.myself = None
-        self._mumble = mumble
-        self._myself_session = None
-        self._lock = Lock()
-        self._callbacks = callbacks
-
-    def handle_update(self, packet: UserState):
-        self._lock.acquire()
-        try:
-            user = self[packet.session]
-            actions = user.update(packet)
-            self._callbacks.on_user_update(user, actions)
-        except KeyError:
-            user = User(self._mumble, packet)
-            self[packet.session] = user
-            if packet.session != self._myself_session:
-                self._callbacks.on_user_created(user)
-            else:
-                self.myself = user
-        self._lock.release()
-
-    def remove(self, packet: UserRemove):
-        self._lock.acquire()
-        try:
-            user = self[packet.session]
-            actor = self[packet.actor]
-            del self[packet.session]
-            self._callbacks.on_user_removed(user, actor, packet.ban, packet.reason)
-        except KeyError:
-            pass
-        self._lock.release()
-
-    def set_myself(self, session: int):
-        self._myself_session = session
-        try:
-            self.myself = self[session]
-        except KeyError:
-            pass
-
-    def count(self):
-        return len(self)
 
 
 class User:
-    def __init__(self, mumble: Mumble, packet: UserState):
+    def __init__(self, mumble: Mumble, callbacks: Callbacks, packet: UserState):
+        self.sound = SoundQueue(mumble, callbacks)
         self._mumble: Mumble = mumble
         self.hash: str = packet.hash
         self.session: int = packet.session
@@ -85,15 +43,32 @@ class User:
         return self._users.myself.session == self.session
 
     def update(self, packet: UserState):
-        self.session: int = packet.session
-        self.channel_id: int = packet.channel_id
-        self.name = packet.name
-        self.priority_speaker = packet.priority_speaker
-        self.muted: bool = packet.mute
-        self.self_muted = packet.self_mute
-        self.deaf = packet.deaf
-        self.self_deaf = packet.deaf
-        self.suppressed = packet.suppress
+        actions = {}
+        if self.channel_id != packet.channel_id:
+            actions["channel_id"] = packet.channel_id
+            self.channel_id: int = packet.channel_id
+        if self.name != packet.name:
+            actions["name"] = packet.name
+            self.name = packet.name
+        if self.priority_speaker != packet.priority_speaker:
+            actions["priority_speaker"] = packet.priority_speaker
+            self.priority_speaker = packet.priority_speaker
+        if self.muted != packet.muted:
+            actions["muted "] = packet.mute
+            self.muted = packet.mute
+        if self.self_muted != packet.self_muted:
+            actions["self_muted "] = packet.self_mute
+            self.self_muted = packet.self_mute
+        if self.deaf != packet.deaf:
+            actions["deaf "] = packet.deaf
+            self.deaf = packet.deaf
+        if self.self_deaf != packet.self_deaf:
+            actions["self_deaf "] = packet.deaf
+            self.self_deaf = packet.deaf
+        if self.suppressed != packet.suppressed:
+            actions["suppressed "] = packet.suppress
+            self.suppressed = packet.suppress
+
         if packet.HasField("comment_hash"):
             if packet.HasField("comment"):
                 self.comment = packet.comment
@@ -104,20 +79,21 @@ class User:
                 self.texture = packet.texture
             else:
                 self._update_texture()
+        return actions
 
     def _update_comment(self):
         if not self._comment_hash:
             return
         packet = RequestBlob()
         packet.session_comment.extend(unpack("!51", self._comment_hash))
-        self._mumble.send_message(MessageType.RequestBlob, packet)
+        self._mumble.request_blob(packet)
 
     def _update_texture(self):
         if not self._texture_hash:
             return
         packet = RequestBlob()
         packet.session_texture.extend(unpack("!51", self._texture_hash))
-        self._mumble.send_message(MessageType.RequestBlob, packet)
+        self._mumble.request_blob(packet)
 
     def mute(self, myself: bool = False, action: bool = True):
         if self.myself() and myself:
@@ -163,7 +139,7 @@ class User:
 
     def register(self):  # TODO: check if this is correct
         command = ModUserState(self.session, user_id=0)
-        self._mumble.execute_command(packet)
+        self._mumble.execute_command(command)
 
     def update_context(self, context_name: bytes):
         command = ModUserState(self.session, plugin_context=context_name)
@@ -183,13 +159,7 @@ class User:
         self._mumble.execute_command(command)
 
     def send_text_message(self, message: str):
-        if not ("<img" in message and "src" in message):
-            if len(message) > self._mumble.max_image_length:
-                raise TextTooLongError(f"Current size: {len(message)}\nMax size: {self._mumble.max_image_length}")
-        elif len(message) > self._mumble.max_image_length:
-            raise ImageTooBigError(f"Current size: {len(message)}\nMax size: {self._mumble.max_image_length}")
-
-        command = TextPrivateMessage(self.session, message)
+        command = TextPrivateMessage(self._mumble, self.session, message)
         self._mumble.execute_command(command)
 
     def kick(self, permanent: bool = False, reason: str = ""):
@@ -206,3 +176,49 @@ class User:
     def remove_listening_channel(self, channel: Channel):
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
         self._mumble.execute_command(command)
+
+
+class Users(dict[int, User]):
+    def __init__(self, mumble: Mumble, callbacks: Callbacks):
+        super().__init__()
+        self.myself: User | None = None
+        self._mumble = mumble
+        self._myself_session = None
+        self._lock = Lock()
+        self._callbacks = callbacks
+
+    def handle_update(self, packet: UserState):
+        self._lock.acquire()
+        try:
+            user = self[packet.session]
+            actions = user.update(packet)
+            self._callbacks.on_user_update(user, actions)
+        except KeyError:
+            user = User(self._mumble, self._callbacks, packet)
+            self[packet.session] = user
+            if packet.session != self._myself_session:
+                self._callbacks.on_user_created(user)
+            else:
+                self.myself = user
+        self._lock.release()
+
+    def remove(self, packet: UserRemove):
+        self._lock.acquire()
+        try:
+            user = self[packet.session]
+            actor = self[packet.actor]
+            del self[packet.session]
+            self._callbacks.on_user_removed(user, actor, packet.ban, packet.reason)
+        except KeyError:
+            pass
+        self._lock.release()
+
+    def set_myself(self, session: int):
+        self._myself_session = session
+        try:
+            self.myself = self[session]
+        except KeyError:
+            pass
+
+    def count(self):
+        return len(self)

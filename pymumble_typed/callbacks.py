@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from pymumble_typed.users import User
+    from pymumble_typed.messages import Message
+    from pymumble_typed.channels import Channel
+
 
 class Callbacks:
     def on_connect(self):
@@ -42,7 +46,7 @@ class Callbacks:
     def on_acl_received(self):
         pass
 
-    def on_permission_denied(self):
+    def on_permission_denied(self, session: int, channel_id: int, name: str, _type: str, reason: str):
         pass
 
 
