@@ -19,7 +19,7 @@ from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 class Command:
     def __init__(self):
         self.id = None
-        self.type: MessageType
+        self.type: MessageType = MessageType.PingPacket
         self.lock = Lock()
         self.response = None
         self.packet: Message | None = None
