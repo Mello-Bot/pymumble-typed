@@ -226,7 +226,10 @@ class Users(dict[int, User]):
         self._lock.acquire()
         try:
             user = self[packet.session]
-            actor = self[packet.actor]
+            try:
+                actor = self[packet.actor]
+            except KeyError:
+                actor = user
             del self[packet.session]
             self._mumble.callbacks.on_user_removed(user, actor, packet.ban, packet.reason)
         except KeyError:
