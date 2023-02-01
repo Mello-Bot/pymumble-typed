@@ -7,20 +7,21 @@ from opuslib import Decoder
 
 from pymumble_typed.sound import SAMPLE_RATE, AudioType, READ_BUFFER_SIZE, SEQUENCE_DURATION
 
+
 if TYPE_CHECKING:
     from pymumble_typed.mumble import Mumble
-    from pymumble_typed.callbacks import Callbacks
 
 from collections import deque
 
 from time import time
+
 
 class SoundChunk:
     def __init__(self, pcm, sequence, calculated_time, _type, target, timestamp: float = time()):
         self.time = calculated_time
         self.pcm = pcm
         self.sequence = sequence
-        self.duration = float(len(sequence)) / 2 / SAMPLE_RATE
+        self.duration = float(len(pcm)) / 2 / SAMPLE_RATE
         self.type = _type
         self.target = target
         self.timestamp = timestamp
@@ -40,13 +41,13 @@ class SoundChunk:
         self.time += duration
         return result
 
+
 class SoundQueue:
-    def __init__(self, mumble: Mumble, callbacks: Callbacks):
+    def __init__(self, mumble: Mumble):
         self._mumble = mumble
-        self._callbacks = callbacks
         self._queue: deque[SoundChunk] = deque()
         self._start_sequence = None
-        self._start_time = None
+        self._start_time = time()
         self._lock = Lock()
         self.decoders = {
             AudioType.OPUS: Decoder(SAMPLE_RATE, 1)
@@ -67,13 +68,11 @@ class SoundQueue:
                 calculated_time = self._start_time + (sequence - self._start_sequence) * SEQUENCE_DURATION
 
             sound = SoundChunk(pcm, sequence, calculated_time, _type, target)
-
-            # FIXME: self._callbacks.on_sound_received()
             return sound
         except KeyError:
-            pass # FIXME: log
+            self._mumble._logger.error("Invalid decoder")
         except Exception:
-            pass # FIXME: log
+            self._mumble._logger.error("Error while decoding audio", exc_info=True)
         finally:
             self._lock.release()
 

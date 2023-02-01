@@ -7,7 +7,6 @@ from pymumble_typed.sound.soundqueue import SoundQueue
 
 if TYPE_CHECKING:
     from pymumble_typed.mumble import Mumble
-    from pymumble_typed.callbacks import Callbacks
 
 from struct import unpack
 from threading import Lock
@@ -18,8 +17,8 @@ from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, Remo
 
 
 class User:
-    def __init__(self, mumble: Mumble, callbacks: Callbacks, packet: UserState):
-        self.sound = SoundQueue(mumble, callbacks)
+    def __init__(self, mumble: Mumble, packet: UserState):
+        self.sound = SoundQueue(mumble)
         self._mumble: Mumble = mumble
         self.hash: str = packet.hash
         self.session: int = packet.session
@@ -184,7 +183,7 @@ class User:
 
     def __str__(self):
         return str({
-            "hash" : self.hash,
+            "hash": self.hash,
             "session": self.session,
             "name": self.name,
             "priority_speaker": self.priority_speaker,
@@ -215,7 +214,7 @@ class Users(dict[int, User]):
             actions = user.update(packet)
             self._mumble.callbacks.on_user_updated(user, actor, actions)
         except KeyError:
-            user = User(self._mumble, self._mumble.callbacks, packet)
+            user = User(self._mumble, packet)
             self[packet.session] = user
             if packet.session != self._myself_session:
                 self._mumble.callbacks.on_user_created(user)

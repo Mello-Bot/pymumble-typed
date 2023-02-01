@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pymumble_typed.sound.soundqueue import SoundChunk
 
 if TYPE_CHECKING:
     from pymumble_typed.users import User
@@ -34,7 +35,7 @@ class Callbacks:
     def on_user_removed(self, user: User, actor: User, ban: bool, reason: str):
         pass
 
-    def on_sound_received(self, user: User, chunk: bytes):
+    def on_sound_received(self, user: User, chunk: SoundChunk):
         pass
 
     def on_message(self, message: Message):

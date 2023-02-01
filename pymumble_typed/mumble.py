@@ -99,14 +99,14 @@ class Ping:
 
 class Mumble(Thread):
     LOOP_RATE = 0.01
-    VERSION = (1, 6, 0)
-    PROTOCOL_VERSION = (1, 6, 0)
+    VERSION = (1, 0, 0)
+    PROTOCOL_VERSION = (1, 2, 4)
     VERSION_STRING = f"PyMumble-Typed {VERSION}"
     BANDWIDTH = 50 * 1000
     CONNECTION_RETRY_INTERVAL = 10
     READ_BUFFER_SIZE = 4096
     OS = f"PyMumble {VERSION}"
-    OS_VERSION = f"Python {sys.version} - {platform.system()} {platform.release()}"
+    OS_VERSION = f"PyMumble"
 
     def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str = None,
                  key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
@@ -247,8 +247,14 @@ class Mumble(Thread):
             self.control_socket.setblocking(False)
 
             version = Version()
-            version.version_v1 = (Mumble.PROTOCOL_VERSION[0] << 16) + (Mumble.PROTOCOL_VERSION[1] << 8) + \
-                                 Mumble.PROTOCOL_VERSION[2]
+            if Mumble.PROTOCOL_VERSION[2] > 255:
+                version.version_v1 = (Mumble.PROTOCOL_VERSION[0] << 16) + (Mumble.PROTOCOL_VERSION[1] << 8) + \
+                                     Mumble.PROTOCOL_VERSION[2] + 255
+            else:
+                version.version_v1 = (Mumble.PROTOCOL_VERSION[0] << 16) + (Mumble.PROTOCOL_VERSION[1] << 8) + \
+                                     Mumble.PROTOCOL_VERSION[2]
+            version.version_v2 = (Mumble.PROTOCOL_VERSION[0] << 48) + (Mumble.PROTOCOL_VERSION[1] << 32) + \
+                                 (Mumble.PROTOCOL_VERSION[2] << 16)
             version.release = self.application
             version.os = Mumble.OS
             version.os_version = Mumble.OS_VERSION
@@ -277,7 +283,6 @@ class Mumble(Thread):
             if self.connected == Status.CONNECTED:
                 while self.command_queue.has_next():
                     self.treat_command(self.command_queue.pop())
-
                 self.sound_output.send_audio()
 
             (rlist, wlist, xlist) = select([self.control_socket], [], [self.control_socket], self.loop_rate)
@@ -443,8 +448,7 @@ class Mumble(Thread):
         if self.server_max_bandwidth is not None:
             self.bandwidth = min(bandwidth, self.server_max_bandwidth)
 
-        if self.sound_output:
-            self.sound_output.set_bandwidth(self.bandwidth)
+        self.sound_output.set_bandwidth(self.bandwidth)
 
     def sound_received(self, packet: bytes):
         pos = 0
@@ -487,13 +491,10 @@ class Mumble(Thread):
                     sound = user.sound.add(packet[pos:pos + size], sequence.value, _type, target)
                     if sound is None:
                         return
-
                     self._callbacks.on_sound_received(user, sound)
-
                     sequence.value += int(round(sound.duration / 100))
                 except CodecNotSupportedError:
                     self._logger.error("Codec not supported", exc_info=True)
-                    pass  # FIXME: log it
                 except KeyError:
                     pass
             pos += size
@@ -541,7 +542,7 @@ class Mumble(Thread):
         return PermissionDenied.DenyType.Name(name)
 
     def stop(self):
-        self.reconnect = None
+        self.reconnect = False
         self.exit = True
         self.control_socket.close()
 
@@ -560,7 +561,6 @@ class Mumble(Thread):
 
     def send_audio(self, udp_packet):
         tcp_packet = pack('!HL', MessageType.UDPTunnel.value, len(udp_packet)) + udp_packet
-
         while len(tcp_packet) > 0:
             sent = self.control_socket.send(tcp_packet)
             if sent < 0:

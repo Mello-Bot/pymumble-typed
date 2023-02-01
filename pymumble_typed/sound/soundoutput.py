@@ -14,14 +14,17 @@ from opuslib import OpusError, Encoder
 from pymumble_typed.commands import VoiceTarget
 from pymumble_typed.tools import VarInt
 
-from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, SEQUENCE_DURATION, \
-    CodecNotSupportedError, CodecProfile
+from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, CodecNotSupportedError, CodecProfile
 from time import time
 
 
 class SoundOutput:
     def __init__(self, mumble: Mumble, audio_per_packet: int, bandwidth: int, stereo=False, profile=CodecProfile.Audio):
         self._mumble = mumble
+
+        self._pcm = []
+        self._lock = Lock()
+
         self._opus_profile: CodecProfile = profile
         self._encoder: Encoder | None = None
         self._encoder_framesize = None
@@ -31,34 +34,30 @@ class SoundOutput:
         self._channels = 1 if not stereo else 2
         self._codec_type = AudioType.OPUS
 
-        self.set_audio_per_packet(audio_per_packet)
         self.set_bandwidth(bandwidth)
+        self.set_audio_per_packet(audio_per_packet)
 
-        self._pcm = []
-        self._lock = Lock()
         self._target = 0
-        self._sequence_start_time = 0
         self._sequence_last_time = 0
         self._sequence = 0
+
+    @property
+    def sample_size(self):
+        return self._channels * 2
+
+    @property
+    def samples(self):
+        return int(self._encoder_framesize * SAMPLE_RATE * self.sample_size)
 
     def send_audio(self):
         if not self._encoder or len(self._pcm) == 0:
             return
 
-        samples = int(self._encoder_framesize * SAMPLE_RATE * 2 * self._channels)
-
-        while len(self._pcm) > 0 and self._sequence_last_time + self._audio_per_packet <= time():
-            current_time = time()
-            if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time:
+        while len(self._pcm) > 0:
+            if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= time():
                 self._sequence = 0
-                self._sequence_start_time = current_time
-                self._sequence_last_time = current_time
-            elif self._sequence_last_time + (self._audio_per_packet * 2) <= current_time:
-                self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
-                self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
             else:
-                self._sequence += int(self._audio_per_packet / SEQUENCE_DURATION)
-                self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
+                self._sequence += 1
 
             payload = bytearray()
             audio_encoded = 0
@@ -68,11 +67,10 @@ class SoundOutput:
                 to_encode = self._pcm.pop(0)
                 self._lock.release()
 
-                if len(to_encode) != samples:
-                    to_encode += b'\x00' * (samples - len(to_encode))
-
+                if len(to_encode) != self.samples:
+                    to_encode += b'\x00' * (self.samples - len(to_encode))
                 try:
-                    encoded = self._encoder.encode(to_encode, int(len(to_encode) / (2 * self._channels)))
+                    encoded = self._encoder.encode(to_encode, len(to_encode) // self.sample_size)
                 except OpusError:
                     encoded = b''
 
@@ -85,14 +83,19 @@ class SoundOutput:
                     if audio_encoded < self._audio_per_packet and len(self._pcm) > 0:
                         frame_header += (1 << 7)
                     frame_header = pack('!B', frame_header)
+
                 payload += frame_header + encoded
-            header = self._codec_type << 5
+
+            header = self._codec_type.value << 5
             sequence = VarInt(self._sequence).encode()
+
             udp_packet = pack('!B', header | self._target) + sequence + payload
             if self._mumble.positional:
                 udp_packet += pack("fff", self._mumble.positional[0], self._mumble.positional[1],
                                    self._mumble.positional[2])
+
             self._mumble.send_audio(udp_packet)
+            self._sequence_last_time = time()
 
     def get_audio_per_packet(self):
         return self._audio_per_packet
@@ -124,15 +127,14 @@ class SoundOutput:
         if len(pcm) % 2 != 0:
             raise Exception("pcm data must be 16 bits")
 
-        samples = int(self._encoder_framesize * SAMPLE_RATE * 2 * self._channels)
         self._lock.acquire()
-        if len(self._pcm) and len(self._pcm[-1]) < samples:
-            initial_offset = samples - len(self._pcm[-1])
+        if len(self._pcm) and len(self._pcm[-1]) < self.samples:
+            initial_offset = self.samples - len(self._pcm[-1])
             self._pcm[-1] += pcm[:initial_offset]
         else:
             initial_offset = 0
-        for i in range(initial_offset, len(pcm), samples):
-            self._pcm.append(pcm[i:i + samples])
+        for i in range(initial_offset, len(pcm), self.samples):
+            self._pcm.append(pcm[i:i + self.samples])
         self._lock.release()
 
     def clear_buffer(self):
@@ -150,9 +152,9 @@ class SoundOutput:
     def create_encoder(self):
         if not self._codec:
             return
-
         if self._codec.opus:
             self._encoder = Encoder(SAMPLE_RATE, self._channels, self._opus_profile)
+
             self._encoder_framesize = self._audio_per_packet
             self._codec_type = AudioType.OPUS
         else:
@@ -162,4 +164,9 @@ class SoundOutput:
     def set_whisper(self, target_id: list[int], channel=False):
         self._target = 1 if channel else 2
         command = VoiceTarget(self._target, target_id)
+        self._mumble.execute_command(command)
+
+    def remove_whisper(self):
+        self._target = 0
+        command = VoiceTarget(self._target, [])
         self._mumble.execute_command(command)
