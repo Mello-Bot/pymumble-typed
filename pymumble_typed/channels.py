@@ -63,7 +63,7 @@ class Channel:
         if packet.HasField("is_enter_restricted") and self.is_enter_restricted != packet.is_enter_restricted:
             actions["is_enter_restricted"] = packet.is_enter_restricted
             self.is_enter_restricted = packet.is_enter_restricted
-        if packet.HasExtension("links") and self.links != packet.links:
+        if packet.links and self.links != packet.links:
             actions["links"] = packet.links
             self.links = packet.links
         if packet.HasField("description_hash"):
