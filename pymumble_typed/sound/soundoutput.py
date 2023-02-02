@@ -29,7 +29,7 @@ class SoundOutput:
         self._encoder: Encoder | None = None
         self._encoder_framesize = None
         self._codec = None
-        self._bandwidth = mumble.bandwidth
+        self._bandwidth = bandwidth
         self._audio_per_packet = audio_per_packet
         self._channels = 1 if not stereo else 2
         self._codec_type = AudioType.OPUS
@@ -102,7 +102,7 @@ class SoundOutput:
 
     def set_audio_per_packet(self, audio_per_packet):
         self._audio_per_packet = audio_per_packet
-        self.create_encoder()
+        self._create_encoder()
 
     def get_bandwidth(self):
         return self._bandwidth
@@ -115,11 +115,11 @@ class SoundOutput:
         if self._encoder:
             overhead_per_packet = 20
             overhead_per_packet += (3 * int(self._audio_per_packet / self._encoder_framesize))
-            if self._mumble.udp_active:
-                overhead_per_packet += 12
-            else:
-                overhead_per_packet += 20  # TCP Header
-                overhead_per_packet += 6  # TCPTunnel Encapsulation
+            # if self._mumble.udp_active:
+            #     overhead_per_packet += 12
+            # else:
+            overhead_per_packet += 20  # TCP Header
+            overhead_per_packet += 6  # TCPTunnel Encapsulation
             overhead_per_second = int(overhead_per_packet * 8 / self._audio_per_packet)
             self._encoder.bitrate = self._bandwidth - overhead_per_second
 
@@ -147,9 +147,9 @@ class SoundOutput:
 
     def set_default_codec(self, codec: CodecVersion):
         self._codec = codec
-        self.create_encoder()
+        self._create_encoder()
 
-    def create_encoder(self):
+    def _create_encoder(self):
         if not self._codec:
             return
         if self._codec.opus:

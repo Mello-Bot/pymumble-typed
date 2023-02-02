@@ -10,18 +10,18 @@ from pymumble_typed import MessageType
 from collections import deque
 from threading import Lock
 
-from pymumble_typed.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, ChannelRemove, \
-    VoiceTarget as VoiceTargetPacket, UserRemove, ACL
+from pymumble_typed.protobuf.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, \
+    ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL
 
 from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 
 
 class Command:
     def __init__(self):
-        self.id = None
+        self.id = 0
         self.type: MessageType = MessageType.PingPacket
         self.lock = Lock()
-        self.response = None
+        self.response = False
         self.packet: Message | None = None
 
 

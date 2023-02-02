@@ -3,9 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.Mumble_pb2 import ChannelState, RequestBlob
+    from pymumble_typed.protobuf.Mumble_pb2 import ChannelState, RequestBlob
     from pymumble_typed.mumble import Mumble
-    from pymumble_typed.callbacks import Callbacks
     from pymumble_typed.users import User
 
 from struct import unpack
@@ -14,7 +13,7 @@ from pymumble_typed.acl import ACL
 from pymumble_typed.commands import CreateChannel, RemoveChannel, Move, TextMessage, LinkChannel, UnlinkChannel, \
     UpdateChannel, QueryACL
 
-from pymumble_typed.Mumble_pb2 import RequestBlob
+from pymumble_typed.protobuf.Mumble_pb2 import RequestBlob
 
 from threading import Lock
 
