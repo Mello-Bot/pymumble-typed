@@ -102,7 +102,7 @@ class Settings:
         self.server_max_image_message_length = 131072
 
 
-class Mumble(Thread):
+class Mumble:
     LOOP_RATE = 0.01
     VERSION = (1, 0, 0)
     PROTOCOL_VERSION = (1, 2, 4)
@@ -122,7 +122,7 @@ class Mumble(Thread):
             tokens = []
         self._debug = debug
         self._parent_thread = current_thread()
-        self._mumble_thread = None
+        self._thread = Thread(target=self._run)
         self._logger = logger if logger else Logger("PyMumble-Typed")
         self._logger.setLevel(DEBUG if debug else ERROR)
         self._host = host
@@ -158,7 +158,6 @@ class Mumble(Thread):
         self._server_max_bandwidth = 0
         # self.udp_active = False
 
-
         self.users: Users = Users(self)
         self.channels: Channels = Channels(self)
         self.settings = Settings()
@@ -180,7 +179,7 @@ class Mumble(Thread):
         return self._callbacks
 
     def set_callbacks(self, callbacks: Callbacks):
-        if self.is_alive():
+        if self._thread.is_alive():
             self.is_ready()
             self._callbacks = callbacks
         else:
@@ -207,15 +206,18 @@ class Mumble(Thread):
 
         self._command_queue = CommandQueue()
 
-    def run(self):
-        self._mumble_thread = current_thread()
+    def start(self):
+        if not self._thread.is_alive():
+            self._thread = Thread(target=self._run)
+            self._thread.start()
 
-        while self.reconnect or self._first_connect or self._parent_thread.is_alive():
+    def _run(self):
+        while (self.reconnect or self._first_connect) and not self._exit:
             self._init_connection()
 
-            if self.connect() >= Status.FAILED:
+            if self._connect() >= Status.FAILED:
                 self._ready_lock.release()
-                if not self.reconnect or not self._parent_thread.is_alive():
+                if not self.reconnect:
                     raise ConnectionRejectedError("Connection error with the Mumble (murmur) Server")
                 else:
                     sleep(Mumble.CONNECTION_RETRY_INTERVAL)
@@ -228,8 +230,12 @@ class Mumble(Thread):
 
             self._callbacks.on_disconnect()
             sleep(Mumble.CONNECTION_RETRY_INTERVAL)
+        try:
+            self._control_socket.close()
+        except:
+            self._logger.debug("Control socket already closed")
 
-    def connect(self):
+    def _connect(self):
         self._first_connect = True
         try:
             server_info = socket.getaddrinfo(self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
@@ -283,8 +289,7 @@ class Mumble(Thread):
 
     def _loop(self):
         self._exit = False
-        while self._status not in (
-                Status.NOT_CONNECTED, Status.FAILED) and self._parent_thread.is_alive() and not self._exit:
+        while self._status not in (Status.NOT_CONNECTED, Status.FAILED) and not self._exit:
             self.ping.send()
             if self._status == Status.CONNECTED:
                 while self._command_queue.has_next():
@@ -297,6 +302,7 @@ class Mumble(Thread):
             elif self._control_socket in xlist:
                 self._control_socket.close()
                 self._status = Status.NOT_CONNECTED
+            self._exit = not self._parent_thread.is_alive()
 
     def send_message(self, _type: MessageType, message: Message):
         if self._debug:
@@ -388,7 +394,8 @@ class Mumble(Thread):
         elif _type == MessageType.TextMessage:
             packet = TextMessage()
             packet.ParseFromString(message)
-            self._callbacks.on_message(MessageContainer(self, packet))
+            if self.is_ready():
+                self._callbacks.on_message(MessageContainer(self, packet))
         elif _type == MessageType.PermissionDenied:
             packet = PermissionDenied()
             packet.ParseFromString(message)
@@ -527,7 +534,7 @@ class Mumble(Thread):
     def execute_command(self, cmd: Command, blocking: bool = True):
         self.is_ready()
         lock = self._command_queue.push(cmd)
-        if blocking and self._mumble_thread is not current_thread():
+        if blocking and self._thread is not current_thread():
             lock.acquire()
             lock.release()
         return lock
