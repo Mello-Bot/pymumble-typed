@@ -28,11 +28,11 @@ class Message:
         try:
             self.author: User | None = mumble.users[message.actor]
         except KeyError:
-            self.author = None
+            self.author: User | None = None
         try:
             self.channel: Channel | None = mumble.channels[message.channel_id.pop()]
         except KeyError:
-            self.channel = None
+            self.channel: Channel | None = None
         except IndexError:
             self.channel = None
         self.content: str = message.message

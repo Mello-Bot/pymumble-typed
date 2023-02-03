@@ -115,11 +115,11 @@ class Mumble:
 
     def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str = None,
                  key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
-                 client_type: Type = Type.BOT, callbacks: Callbacks = Callbacks(), debug: bool = False,
-                 logger: Logger = None):
+                 client_type: Type = Type.BOT, debug: bool = False, logger: Logger = None):
         super().__init__()
         if tokens is None:
             tokens = []
+        self._ready = False
         self._debug = debug
         self._parent_thread = current_thread()
         self._thread = Thread(target=self._run)
@@ -140,8 +140,7 @@ class Mumble:
         self.sound_receive = False
         self._loop_rate = Mumble.LOOP_RATE
         self.application = Mumble.VERSION_STRING
-        self._requested_callbacks = callbacks
-        self._callbacks = Callbacks()
+        self._callbacks = Callbacks(self)
 
         self._ready_lock = Lock()
         self._ready_lock.acquire()
@@ -178,17 +177,14 @@ class Mumble:
     def callbacks(self):
         return self._callbacks
 
-    def set_callbacks(self, callbacks: Callbacks):
-        if self._thread.is_alive():
-            self.is_ready()
-            self._callbacks = callbacks
-        else:
-            self._requested_callbacks = callbacks
+    @property
+    def ready(self):
+        return self._ready
 
     def _init_connection(self):
+        self._ready = False
         self._first_connect = False
         self._ready_lock.acquire(False)
-        self._callbacks = Callbacks()
         self.ping = Ping(self)
         self._status = Status.NOT_CONNECTED
 
@@ -228,7 +224,7 @@ class Mumble:
                 self._logger.error("Error while executing loop", exc_info=True)
                 self._status = Status.NOT_CONNECTED
 
-            self._callbacks.on_disconnect()
+            self._callbacks.dispatch("on_disconnect")
             sleep(Mumble.CONNECTION_RETRY_INTERVAL)
         try:
             self._control_socket.close()
@@ -370,8 +366,9 @@ class Mumble:
             if self._status is Status.AUTHENTICATING:
                 self._status = Status.CONNECTED
                 self._ready_lock.release()
-                self._callbacks = self._requested_callbacks
-                self._callbacks.on_connect()
+                self._ready = True
+                self._callbacks.ready()
+                self._callbacks.dispatch("on_connect")
         elif _type == MessageType.ChannelRemove:
             packet = ChannelRemove()
             packet.ParseFromString(message)
@@ -394,20 +391,19 @@ class Mumble:
         elif _type == MessageType.TextMessage:
             packet = TextMessage()
             packet.ParseFromString(message)
-            if self.is_ready():
-                self._callbacks.on_message(MessageContainer(self, packet))
+            self._callbacks.dispatch("on_message", MessageContainer(self, packet))
         elif _type == MessageType.PermissionDenied:
             packet = PermissionDenied()
             packet.ParseFromString(message)
             # FIXME: CALLBACK Permission Denied
-            self._callbacks.on_permission_denied(packet.session, packet.channel_id, packet.name, packet.type,
-                                                 packet.reason)
+            self._callbacks.dispatch("on_permission_denied", packet.session, packet.channel_id, packet.name,
+                                     packet.type, packet.reason)
         elif _type == MessageType.ACL:
             packet = ACL()
             packet.ParseFromString(message)
             self.channels[packet.channel_id].update_acl(packet)
             # FIXME: CALLBACK ACL
-            self._callbacks.on_acl_received()
+            self._callbacks.dispatch("on_acl_received")
         elif _type == MessageType.QueryUsers:
             packet = QueryUsers()
             packet.ParseFromString(message)
@@ -419,7 +415,7 @@ class Mumble:
             packet = ContextActionModify()
             packet.ParseFromString(message)
             # FIXME: CALLBACK ContextActionModify
-            self._callbacks.on_context_action()
+            self._callbacks.dispatch("on_context_action")
         elif _type == MessageType.ContextAction:
             packet = ContextAction()
             packet.ParseFromString(message)
@@ -504,7 +500,7 @@ class Mumble:
                     sound = user.sound.add(packet[pos:pos + size], sequence.value, _type, target)
                     if sound is None:
                         return
-                    self._callbacks.on_sound_received(user, sound)
+                    self._callbacks.dispatch("on_sound_received", user, sound)
                     sequence.value += int(round(sound.duration / 100))
                 except CodecNotSupportedError:
                     self._logger.error("Codec not supported", exc_info=True)

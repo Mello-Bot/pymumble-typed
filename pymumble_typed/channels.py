@@ -167,11 +167,11 @@ class Channels(dict[int, Channel]):
         try:
             channel = self[packet.channel_id]
             actions = channel.update(packet)
-            self._mumble.callbacks.on_channel_updated(channel, actions)
+            self._mumble.callbacks.dispatch("on_channel_updated", channel, actions)
         except KeyError:
             channel = Channel(self._mumble, packet)
             self[packet.channel_id] = channel
-            self._mumble.callbacks.on_channel_created(channel)
+            self._mumble.callbacks.dispatch("on_channel_created", channel)
         self._lock.release()
 
     def remove(self, channel_id: int):
@@ -180,7 +180,7 @@ class Channels(dict[int, Channel]):
         try:
             channel = self[channel_id]
             del self[channel_id]
-            self._mumble.callbacks.on_channel_removed(channel)
+            self._mumble.callbacks.dispatch("on_channel_removed", channel)
         except KeyError:
             pass
         self._lock.release()

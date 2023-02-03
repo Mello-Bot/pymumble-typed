@@ -211,12 +211,12 @@ class Users(dict[int, User]):
             user = self[packet.session]
             actor = self[packet.actor]
             actions = user.update(packet)
-            self._mumble.callbacks.on_user_updated(user, actor, actions)
+            self._mumble.callbacks.dispatch("on_user_updated", user, actor, actions)
         except KeyError:
             user = User(self._mumble, packet)
             self[packet.session] = user
             if packet.session != self._myself_session:
-                self._mumble.callbacks.on_user_created(user)
+                self._mumble.callbacks.dispatch("on_user_created", user)
             else:
                 self.myself = user
         self._lock.release()
@@ -230,7 +230,7 @@ class Users(dict[int, User]):
             except KeyError:
                 actor = user
             del self[packet.session]
-            self._mumble.callbacks.on_user_removed(user, actor, packet.ban, packet.reason)
+            self._mumble.callbacks.dispatch("on_user_removed", user, actor, packet.ban, packet.reason)
         except KeyError:
             pass
         self._lock.release()
