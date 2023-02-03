@@ -1,6 +1,6 @@
 from enum import IntEnum, Enum
 
-AUDIO_PER_PACKET = 0.01
+AUDIO_PER_PACKET = 0.02
 READ_BUFFER_SIZE: int = 4096
 SAMPLE_RATE: int = 48000
 SEQUENCE_DURATION: float = 0.01

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.Mumble_pb2 import CodecVersion
+    from pymumble_typed.protobuf.Mumble_pb2 import CodecVersion
     from pymumble_typed.mumble import Mumble
 
 from struct import pack
@@ -14,7 +14,8 @@ from opuslib import OpusError, Encoder
 from pymumble_typed.commands import VoiceTarget
 from pymumble_typed.tools import VarInt
 
-from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, CodecNotSupportedError, CodecProfile
+from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, CodecNotSupportedError, CodecProfile, \
+    SEQUENCE_DURATION
 from time import time
 
 
@@ -38,6 +39,7 @@ class SoundOutput:
         self.set_audio_per_packet(audio_per_packet)
 
         self._target = 0
+        self._sequence_start_time = 0
         self._sequence_last_time = 0
         self._sequence = 0
 
@@ -53,11 +55,19 @@ class SoundOutput:
         if not self._encoder or len(self._pcm) == 0:
             return
 
-        while len(self._pcm) > 0:
-            if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= time():
+        while len(self._pcm) > 0 and self._sequence_last_time + self._audio_per_packet <= time():
+            current_time = time()
+            if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time:  # waited enough, resetting sequence to 0
                 self._sequence = 0
-            else:
-                self._sequence += 1
+                self._sequence_start_time = current_time
+                self._sequence_last_time = current_time
+            elif self._sequence_last_time + (self._audio_per_packet * 2) <= current_time:  # give some slack (2*audio_per_frame) before interrupting a continuous sequence
+                # calculating sequence after a pause
+                self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
+                self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
+            else:  # continuous sound
+                self._sequence += int(self._audio_per_packet / SEQUENCE_DURATION)
+                self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
             payload = bytearray()
             audio_encoded = 0
@@ -75,27 +85,19 @@ class SoundOutput:
                     encoded = b''
 
                 audio_encoded += self._encoder_framesize
-
-                if self._codec_type == AudioType.OPUS:
-                    frame_header = VarInt(len(encoded)).encode()
-                else:
-                    frame_header = len(encoded)
-                    if audio_encoded < self._audio_per_packet and len(self._pcm) > 0:
-                        frame_header += (1 << 7)
-                    frame_header = pack('!B', frame_header)
-
+                frame_header = VarInt(len(encoded)).encode()
                 payload += frame_header + encoded
 
             header = self._codec_type.value << 5
             sequence = VarInt(self._sequence).encode()
 
             udp_packet = pack('!B', header | self._target) + sequence + payload
+
             if self._mumble.positional:
                 udp_packet += pack("fff", self._mumble.positional[0], self._mumble.positional[1],
                                    self._mumble.positional[2])
 
             self._mumble.send_audio(udp_packet)
-            self._sequence_last_time = time()
 
     def get_audio_per_packet(self):
         return self._audio_per_packet
@@ -108,7 +110,7 @@ class SoundOutput:
         return self._bandwidth
 
     def set_bandwidth(self, bandwidth):
-        self._bandwidth = bandwidth
+        self._bandwidth = min(96000, bandwidth)
         self._set_bandwidth()
 
     def _set_bandwidth(self):
