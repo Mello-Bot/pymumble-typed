@@ -117,6 +117,7 @@ class Mumble:
                  key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
                  client_type: Type = Type.BOT, debug: bool = False, logger: Logger = None):
         super().__init__()
+        self._command_limit = 5
         if tokens is None:
             tokens = []
         self._ready = False
@@ -168,6 +169,17 @@ class Mumble:
 
         self._exit = False
         self._first_connect = True
+
+    @property
+    def command_limit(self):
+        return self._command_limit
+
+    @command_limit.setter
+    def command_limit(self, limit: int):
+        if limit <= 0:
+            self._logger.error("Command limit cannot be less than 0")
+            return
+        self._command_limit = limit
 
     @property
     def logger(self):
@@ -288,8 +300,11 @@ class Mumble:
         while self._status not in (Status.NOT_CONNECTED, Status.FAILED) and not self._exit:
             self.ping.send()
             if self._status == Status.CONNECTED:
-                while self._command_queue.has_next():
-                    self._treat_command(self._command_queue.pop())
+                if self._command_queue.has_next():
+                    # FIXME: experimental, limit number of command per cycle to avoid too long processing
+                    #   this may be useful on busy server or if the client is sending a lot of command
+                    for _ in range(0, min(len(self._command_queue), self._command_limit)):
+                        self._treat_command(self._command_queue.pop())
                 self.sound_output.send_audio()
 
             (rlist, wlist, xlist) = select([self._control_socket], [], [self._control_socket], self._loop_rate)
@@ -365,8 +380,13 @@ class Mumble:
 
             if self._status is Status.AUTHENTICATING:
                 self._status = Status.CONNECTED
-                self._ready_lock.release()
                 self._ready = True
+
+                # FIXME: experimental, using number of users as command limit per loop cycle
+                #  since this is set on client startup minimum is 5 to avoid excessively low limit
+                if len(self.users) > self._command_limit:
+                    self._command_limit = len(self.users)
+                self._ready_lock.release()
                 self._callbacks.ready()
                 self._callbacks.dispatch("on_connect")
         elif _type == MessageType.ChannelRemove:

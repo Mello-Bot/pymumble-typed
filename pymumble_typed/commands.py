@@ -283,3 +283,6 @@ class CommandQueue:
 
     def answer(self, cmd: Command):
         cmd.lock.release()
+
+    def __len__(self):
+        return len(self.queue)
