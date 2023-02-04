@@ -104,7 +104,7 @@ class Settings:
 
 class Mumble:
     LOOP_RATE = 0.01
-    VERSION = (1, 1, 1)
+    VERSION = (1, 1, 2)
     PROTOCOL_VERSION = (1, 2, 4)
     VERSION_STRING = f"PyMumble-Typed {VERSION}"
     BANDWIDTH = 50 * 1000
@@ -227,14 +227,13 @@ class Mumble:
                 self._ready_lock.release()
                 if not self.reconnect:
                     raise ConnectionRejectedError("Connection error with the Mumble (murmur) Server")
-                else:
-                    sleep(Mumble.CONNECTION_RETRY_INTERVAL)
-            try:
-                self._logger.debug("Starting loop")
-                self._loop()
-            except socket.error:
-                self._logger.error("Error while executing loop", exc_info=True)
-                self._status = Status.NOT_CONNECTED
+            else:
+                try:
+                    self._logger.debug("Starting loop")
+                    self._loop()
+                except socket.error:
+                    self._logger.error("Error while executing loop", exc_info=True)
+                    self._status = Status.NOT_CONNECTED
 
             self._callbacks.dispatch("on_disconnect")
             sleep(Mumble.CONNECTION_RETRY_INTERVAL)
