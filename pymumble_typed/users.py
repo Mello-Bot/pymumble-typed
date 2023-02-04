@@ -86,14 +86,14 @@ class User:
         if not self._comment_hash:
             return
         packet = RequestBlob()
-        packet.session_comment.extend(unpack("!51", self._comment_hash))
+        packet.session_comment.extend(unpack("!5I", self._comment_hash))
         self._mumble.request_blob(packet)
 
     def _update_texture(self):
         if not self._texture_hash:
             return
         packet = RequestBlob()
-        packet.session_texture.extend(unpack("!51", self._texture_hash))
+        packet.session_texture.extend(unpack("!5I", self._texture_hash))
         self._mumble.request_blob(packet)
 
     def mute(self, myself: bool = False, action: bool = True):
