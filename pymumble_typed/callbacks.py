@@ -68,6 +68,9 @@ class Callbacks:
         except Exception:
             self._client.logger.error("Error while executing callback", exc_info=True)
 
+    def disable(self):
+        self._callbacks = {}
+
     def ready(self):
         if self._client.ready:
             self._callbacks = self._temp

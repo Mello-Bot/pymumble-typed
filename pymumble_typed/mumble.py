@@ -104,7 +104,7 @@ class Settings:
 
 class Mumble:
     LOOP_RATE = 0.01
-    VERSION = (1, 1, 2)
+    VERSION = (1, 1, 3)
     PROTOCOL_VERSION = (1, 2, 4)
     VERSION_STRING = f"PyMumble-Typed {VERSION}"
     BANDWIDTH = 50 * 1000
@@ -236,6 +236,7 @@ class Mumble:
                     self._status = Status.NOT_CONNECTED
 
             self._callbacks.dispatch("on_disconnect")
+            self._callbacks.disable()
             sleep(Mumble.CONNECTION_RETRY_INTERVAL)
         try:
             self._control_socket.close()
