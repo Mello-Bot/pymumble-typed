@@ -130,11 +130,11 @@ class User:
     def unrecording(self):
         self.recording(False)
 
-    def comment(self, comment: str):
+    def set_comment(self, comment: str):
         command = ModUserState(self.session, comment=comment)
         self._mumble.execute_command(command)
 
-    def texture(self, texture: str):
+    def set_texture(self, texture: str):
         command = ModUserState(self.session, texture=texture)
         self._mumble.execute_command(command)
 
