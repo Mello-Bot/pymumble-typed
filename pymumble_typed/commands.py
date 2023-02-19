@@ -135,11 +135,16 @@ class UpdateChannel(Command):
         self.type = MessageType.ChannelState
         self.packet = ChannelState()
         self.packet.channel_id = channel_id
-        self.packet.name = name
-        self.packet.parent = parent
-        self.packet.position = position
-        self.packet.max_users = max_users
-        self.packet.description = description
+        if name:
+            self.packet.name = name
+        if parent:
+            self.packet.parent = parent
+        if position:
+            self.packet.position = position
+        if max_users:
+            self.packet.max_users = max_users
+        if description:
+            self.packet.description = description
 
 
 class VoiceTarget(Command):

@@ -104,7 +104,7 @@ class Settings:
 
 class Mumble:
     LOOP_RATE = 0.01
-    VERSION = (1, 1, 5)
+    VERSION = (1, 1, 6)
     PROTOCOL_VERSION = (1, 2, 4)
     VERSION_STRING = f"PyMumble-Typed {VERSION}"
     BANDWIDTH = 50 * 1000
