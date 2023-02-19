@@ -39,31 +39,31 @@ class Channel:
         actions = {}
 
         if packet.HasField("channel_id") and self.id != packet.channel_id:
-            actions["id"] = packet.channel_id
+            actions["id"] = self.id
             self.id = packet.channel_id
         if packet.HasField("name") and self.name != packet.name:
-            actions["name"] = packet.name
+            actions["name"] = self.name
             self.name = packet.name
         if packet.HasField("parent") and self._parent != packet.parent:
-            actions["parent"] = packet.parent
+            actions["parent"] = self.parent
             self._parent = packet.parent
         if packet.HasField("temporary") and self.temporary != packet.temporary:
-            actions["temporary"] = packet.temporary
+            actions["temporary"] = self.temporary
             self.temporary = packet.temporary
         if packet.HasField("position") and self.position != packet.position:
-            actions["position"] = packet.position
+            actions["position"] = self.position
             self.position = packet.position
         if packet.HasField("max_users") and self.max_users != packet.max_users:
-            actions["max_users"] = packet.max_users
+            actions["max_users"] = self.max_users
             self.max_users = packet.max_users
         if packet.HasField("can_enter") and self.can_enter != packet.can_enter:
-            actions["can_enter"] = packet.can_enter
+            actions["can_enter"] = self.can_enter
             self.can_enter = packet.can_enter
         if packet.HasField("is_enter_restricted") and self.is_enter_restricted != packet.is_enter_restricted:
-            actions["is_enter_restricted"] = packet.is_enter_restricted
+            actions["is_enter_restricted"] = self.is_enter_restricted
             self.is_enter_restricted = packet.is_enter_restricted
         if packet.links and self.links != packet.links:
-            actions["links"] = packet.links
+            actions["links"] = self.links
             self.links = packet.links
         if packet.HasField("description_hash"):
             self._description_hash = packet.description_hash
@@ -166,8 +166,8 @@ class Channels(dict[int, Channel]):
         self._lock.acquire()
         try:
             channel = self[packet.channel_id]
-            actions = channel.update(packet)
-            self._mumble.callbacks.dispatch("on_channel_updated", channel, actions)
+            before = channel.update(packet)
+            self._mumble.callbacks.dispatch("on_channel_updated", channel, before)
         except KeyError:
             channel = Channel(self._mumble, packet)
             self[packet.channel_id] = channel

@@ -43,28 +43,28 @@ class User:
     def update(self, packet: UserState):
         actions = {}
         if packet.HasField("channel_id") and self.channel_id != packet.channel_id:
-            actions["channel_id"] = packet.channel_id
+            actions["channel_id"] = self.channel_id
             self.channel_id: int = packet.channel_id
         if packet.HasField("name") and self.name != packet.name:
-            actions["name"] = packet.name
+            actions["name"] = self.name
             self.name = packet.name
         if packet.HasField("priority_speaker") and self.priority_speaker != packet.priority_speaker:
-            actions["priority_speaker"] = packet.priority_speaker
+            actions["priority_speaker"] = self.priority_speaker
             self.priority_speaker = packet.priority_speaker
         if packet.HasField("mute") and self.muted != packet.mute:
-            actions["mute"] = packet.mute
+            actions["mute"] = self.muted
             self.muted = packet.mute
         if packet.HasField("self_mute") and self.self_muted != packet.self_mute:
-            actions["self_mute"] = packet.self_mute
+            actions["self_mute"] = self.self_muted
             self.self_muted = packet.self_mute
         if packet.HasField("deaf") and self.deaf != packet.deaf:
-            actions["deaf"] = packet.deaf
+            actions["deaf"] = self.deaf
             self.deaf = packet.deaf
         if packet.HasField("self_deaf") and self.self_deaf != packet.self_deaf:
-            actions["self_deaf"] = packet.self_deaf
+            actions["self_deaf"] = self.self_deaf
             self.self_deaf = packet.self_deaf
         if packet.HasField("suppress") and self.suppressed != packet.suppress:
-            actions["suppress"] = packet.suppress
+            actions["suppress"] = self.suppress
             self.suppressed = packet.suppress
 
         if packet.HasField("comment_hash"):
@@ -210,8 +210,8 @@ class Users(dict[int, User]):
         try:
             user = self[packet.session]
             actor = self[packet.actor]
-            actions = user.update(packet)
-            self._mumble.callbacks.dispatch("on_user_updated", user, actor, actions)
+            before = user.update(packet)
+            self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
         except KeyError:
             user = User(self._mumble, packet)
             self[packet.session] = user
