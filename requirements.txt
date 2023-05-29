@@ -1,5 +1,5 @@
 mypy-protobuf==3.4.0
 opuslib==3.0.1
-protobuf==4.21.12
-types-protobuf==4.21.0.4
-typing_extensions==4.4.0
+protobuf==4.23.2
+types-protobuf==4.23.0.1
+typing_extensions==4.6.2
