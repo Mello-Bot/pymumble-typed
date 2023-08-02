@@ -5,7 +5,7 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name="pymumble-typed",
-    version="1.1.7",
+    version="1.2.0",
     author='nico9889',
     author_email='contact@nico9889.me',
     description="Mumble library used for multiple uses like making mumble bot.",

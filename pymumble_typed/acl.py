@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 from threading import Lock
 
 
-
 class ChannelGroup:
     def __init__(self, group: ACLPacket.ChanGroup):
         self.name = group.name
@@ -89,5 +88,3 @@ class ACL:
             except KeyError:
                 self.groups[acl.group] = ChannelACL(acl)
         self._lock.release()
-
-

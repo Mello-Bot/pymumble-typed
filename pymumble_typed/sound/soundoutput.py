@@ -14,7 +14,7 @@ from opuslib import OpusError, Encoder
 from pymumble_typed.commands import VoiceTarget
 from pymumble_typed.tools import VarInt
 
-from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, CodecNotSupportedError, CodecProfile, \
+from pymumble_typed.sound import AudioType, SAMPLE_RATE, SEQUENCE_RESET_INTERVAL, CodecNotSupportedError, CodecProfile,\
     SEQUENCE_DURATION
 from time import time
 
@@ -52,7 +52,7 @@ class SoundOutput:
         return int(self._encoder_framesize * SAMPLE_RATE * self.sample_size)
 
     def send_audio(self):
-        if not self._encoder or len(self._pcm) == 0:
+        if not self._encoder:
             return
 
         while len(self._pcm) > 0 and self._sequence_last_time + self._audio_per_packet <= time():
@@ -61,7 +61,8 @@ class SoundOutput:
                 self._sequence = 0
                 self._sequence_start_time = current_time
                 self._sequence_last_time = current_time
-            elif self._sequence_last_time + (self._audio_per_packet * 2) <= current_time:  # give some slack (2*audio_per_frame) before interrupting a continuous sequence
+            elif self._sequence_last_time + (
+                    self._audio_per_packet * 2) <= current_time:  # give some slack (2*audio_per_frame) before interrupting a continuous sequence
                 # calculating sequence after a pause
                 self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
                 self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
