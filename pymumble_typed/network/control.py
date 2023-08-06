@@ -124,7 +124,7 @@ class ControlStack:
             self.socket.connect((self.host, self.port))
         except socket_error:
             self.status = Status.FAILED
-            self.logger.error("Error while upgrading to encrypted connection", exc_info=True)
+            self.logger.error("ControlStack: Error while upgrading to encrypted connection", exc_info=True)
 
         try:
             self.logger.debug("ControlStack: Sending version")
@@ -135,7 +135,7 @@ class ControlStack:
             self.send_message(MessageType.Authenticate, authenticate)
         except socket_error as exc:
             self.status = Status.FAILED
-            self.logger.error("Failed to send authentication messages", exc_info=True)
+            self.logger.error("ControlStack: Failed to send authentication messages", exc_info=True)
             raise exc
         self.status = Status.AUTHENTICATING
         self.thread.start()
@@ -144,12 +144,13 @@ class ControlStack:
         self._on_disconnect = func
 
     def send_message(self, _type: MessageType, message: Message):
+        self.logger.debug(f"ControlStack: sending TCP {_type.name}")
         packet = pack("!HL", _type.value, message.ByteSize()) + message.SerializeToString()
 
         while len(packet) > 0:
             sent = self.socket.send(packet)
             if sent < 0:
-                raise socket_error("Server socket error")
+                raise socket_error("ControlStack: Server socket error")
             packet = packet[sent:]
 
     def _read_control_messages(self):
@@ -157,7 +158,7 @@ class ControlStack:
             buffer: bytes = self.socket.recv(READ_BUFFER_SIZE)
             self.receive_buffer += buffer
         except socket_error:
-            self.logger.error("Error while reading control messages", exc_info=True)
+            self.logger.error("ControlStack: Error while reading control messages", exc_info=True)
             return
 
         while len(self.receive_buffer) >= 6:
@@ -226,8 +227,9 @@ class ControlStack:
                 try:
                     self.logger.debug("ControlStack: Listening...")
                     self._listen()
-                except socket_error:
-                    self.logger.error(f"ControlStack: Exception cause exit from control loop. Reconnect: {self.reconnect}")
+                except socket_error as e:
+                    self.logger.error(
+                        f"ControlStack: Exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
                     self.status = Status.FAILED
             self._on_disconnect()
             sleep(CONNECTION_RETRY_INTERVAL)
