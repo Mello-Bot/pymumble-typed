@@ -61,7 +61,7 @@ class SoundQueue:
         try:
             pcm = self.decoders[_type].decode(audio, READ_BUFFER_SIZE)
             if not self._start_sequence or sequence <= self._start_sequence:
-                self.start_time = time()
+                self._start_time = time()
                 self._start_sequence = sequence
                 calculated_time = self._start_time
             else:
@@ -70,9 +70,9 @@ class SoundQueue:
             sound = SoundChunk(pcm, sequence, calculated_time, _type, target)
             return sound
         except KeyError:
-            self._mumble._logger.error("Invalid decoder")
+            self._mumble.logger.error("Invalid decoder")
         except Exception:
-            self._mumble._logger.error("Error while decoding audio", exc_info=True)
+            self._mumble.logger.error("Error while decoding audio", exc_info=True)
         finally:
             self._lock.release()
 
