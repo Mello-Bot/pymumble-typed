@@ -24,7 +24,7 @@ from pymumble_typed.users import Users
 
 from enum import IntEnum
 from threading import current_thread
-from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError
+from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
 
 
 class ClientType(IntEnum):
@@ -40,10 +40,6 @@ class Settings:
 
 
 class Mumble:
-    VERSION = (1, 1, 7)
-    PROTOCOL_VERSION = (1, 2, 4)
-    BANDWIDTH = 50 * 1000
-
     def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str = None,
                  key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
                  client_type: ClientType = ClientType.BOT, debug: bool = False, logger: Logger = None):
@@ -66,7 +62,7 @@ class Mumble:
 
         self.positional = None
 
-        self._bandwidth = Mumble.BANDWIDTH
+        self._bandwidth = BANDWIDTH
         self._server_max_bandwidth = 0
 
         self.users: Users = Users(self)
@@ -77,6 +73,10 @@ class Mumble:
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
+
+    @property
+    def sound_output(self):
+        return self.voice
 
     @property
     def voice_connection(self):
@@ -110,9 +110,8 @@ class Mumble:
         self._control.connect()
 
     def _init(self):
-        self._bandwidth = Mumble.BANDWIDTH
-        self._server_max_bandwidth = 96000
-        # self.udp_active = False
+        self._bandwidth = BANDWIDTH
+        self._server_max_bandwidth = BANDWIDTH
 
         self.settings = Settings()
         self.users = Users(self)
@@ -240,7 +239,8 @@ class Mumble:
         elif _type == MessageType.ServerConfig:
             packet = ServerConfig()
             packet.ParseFromString(message)
-            self._server_max_bandwidth = packet.max_bandwidth
+            if packet.HasField("max_bandwidth"):
+                self._server_max_bandwidth = packet.max_bandwidth
             if packet.HasField("allow_html"):
                 self.settings.server_allow_html = packet.allow_html
             if packet.HasField("message_length"):
