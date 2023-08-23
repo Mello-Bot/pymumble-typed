@@ -28,3 +28,8 @@ class MessageType(IntEnum):
     RequestBlob = 23
     ServerConfig = 24
     SuggestConfig = 25
+
+
+class UdpMessageType(IntEnum):
+    Audio = 0
+    Ping = 1

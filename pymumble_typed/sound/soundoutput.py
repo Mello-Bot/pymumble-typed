@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pymumble_typed.network.udp_data import AudioData
+
 if TYPE_CHECKING:
     from pymumble_typed.protobuf.Mumble_pb2 import CodecVersion
     from pymumble_typed.mumble import Mumble
@@ -70,7 +72,7 @@ class SoundOutput:
                 self._sequence += int(self._audio_per_packet / SEQUENCE_DURATION)
                 self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
-            payload = bytearray()
+            audio = AudioData()
             audio_encoded = 0
 
             while len(self._pcm) > 0 and audio_encoded < self._audio_per_packet:
@@ -84,21 +86,13 @@ class SoundOutput:
                     encoded = self._encoder.encode(to_encode, len(to_encode) // self.sample_size)
                 except OpusError:
                     encoded = b''
-
+                audio.add_chunk(encoded)
                 audio_encoded += self._encoder_framesize
-                frame_header = VarInt(len(encoded)).encode()
-                payload += frame_header + encoded
-
-            header = self._codec_type.value << 5
-            sequence = VarInt(self._sequence).encode()
-
-            udp_packet = pack('!B', header | self._target) + sequence + payload
-
-            if self._mumble.positional:
-                udp_packet += pack("fff", self._mumble.positional[0], self._mumble.positional[1],
-                                   self._mumble.positional[2])
-
-            self._mumble.send_audio(udp_packet)
+            audio.target = self._target
+            audio.codec = self._codec_type.value
+            audio.sequence = self._sequence
+            audio.positional = self._mumble.positional
+            self._mumble.send_audio(audio.legacy_udp_packet)
 
     def get_audio_per_packet(self):
         return self._audio_per_packet
@@ -139,6 +133,7 @@ class SoundOutput:
         for i in range(initial_offset, len(pcm), self.samples):
             self._pcm.append(pcm[i:i + self.samples])
         self._lock.release()
+        print(self._pcm.__len__())
 
     def clear_buffer(self):
         self._lock.acquire()
