@@ -5,7 +5,7 @@ from select import select
 
 from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
 from struct import pack, unpack
-from threading import Thread, current_thread
+from threading import Thread, current_thread, Lock
 from time import sleep, time
 from typing import TYPE_CHECKING
 from ssl import wrap_socket, PROTOCOL_TLS, PROTOCOL_TLSv1
@@ -15,8 +15,8 @@ from pymumble_typed.commands import CommandQueue, Command
 from pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
 from pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, LOOP_RATE, READ_BUFFER_SIZE
 from pymumble_typed.network.ping import Ping
+from pymumble_typed.network.udp_data import AudioData
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate
-from pymumble_typed.sound.soundoutput import SoundOutput
 
 if TYPE_CHECKING:
     from pymumble_typed.mumble import ClientType
@@ -35,7 +35,7 @@ class Status(IntEnum):
 
 class ControlStack:
     def __init__(self, host: str, port: int, user: str, password: str | None, tokens: list[str], cert_file: str,
-                 key_file: str, client_type: ClientType, sound_output: SoundOutput, logger: Logger):
+                 key_file: str, client_type: ClientType, logger: Logger):
         self.socket: SSLSocket | None = None
         self.user = user
         self.password = password
@@ -56,14 +56,19 @@ class ControlStack:
         self._on_disconnect: Callable[[], None] = lambda: None
         self.ping: Ping = Ping()
         self.receive_buffer: bytes = bytes()
-        self.sound_output = sound_output
         self._dispatch_control_message = lambda _, __: None
         self.thread = Thread(target=self.loop)
 
-    def reinit(self, sound_output: SoundOutput) -> ControlStack:
+        self._legacy_buffer: list[AudioData] = []
+
+        self._ready = Lock()
+        self._ready.acquire(True)
+        self._legacy_buffer_lock = Lock()
+
+    def reinit(self) -> ControlStack:
         self.disconnect()
         return ControlStack(self.host, self.port, self.user, self.password, self.tokens, self.cert_file, self.key_file,
-                            self.client_type, sound_output, self.logger)
+                            self.client_type, self.logger)
 
     def set_version_string(self, version_string: str):
         self.version_string = version_string
@@ -138,7 +143,9 @@ class ControlStack:
             self.logger.error("ControlStack: Failed to send authentication messages", exc_info=True)
             raise exc
         self.status = Status.AUTHENTICATING
-        self.thread.start()
+        if not self.thread.is_alive():
+            self.thread = Thread(target=self.loop)
+            self.thread.start()
 
     def on_disconnect(self, func: Callable[[], None]):
         self._on_disconnect = func
@@ -188,6 +195,15 @@ class ControlStack:
             cmd.response = True
             self.command_queue.answer(cmd)
 
+    def send_audio_legacy(self, audio: AudioData):
+        tcp_packet = audio.legacy_tcp_packet
+        while len(tcp_packet) > 0:
+            sent = self.socket.send(tcp_packet)
+            self.logger.debug(f"Mumble: audio sent {sent}")
+            if sent < 0:
+                raise socket_error("Server socket error while sending audio")
+            tcp_packet = tcp_packet[sent:]
+
     def _listen(self):
         exit_ = False
         parent_thread = current_thread()
@@ -201,7 +217,16 @@ class ControlStack:
                     #   this may be useful on busy server or if the client is sending a lot of command
                     for _ in range(0, min(len(self.command_queue), self.command_limit)):
                         self._treat_command(self.command_queue.pop())
-                self.sound_output.send_audio()
+
+                if self._legacy_buffer_lock.acquire(False):
+                    try:
+                        audio = self._legacy_buffer.pop(0)
+                        self.send_audio_legacy(audio)
+                        # self.send_message(MessageType.UDPTunnel, audio.tcp_packet)
+                    except IndexError:
+                        pass
+                    self._legacy_buffer_lock.release()
+
             (rlist, wlist, xlist) = select([self.socket], [], [self.socket], self.loop_rate)
             if self.socket in rlist:
                 self._read_control_messages()
@@ -227,6 +252,7 @@ class ControlStack:
                 try:
                     self.logger.debug("ControlStack: Listening...")
                     self._listen()
+                    self._ready.acquire(True)
                 except socket_error as e:
                     self.logger.error(
                         f"ControlStack: Exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
@@ -256,3 +282,21 @@ class ControlStack:
         packet.opus = True
         packet.client_type = self.client_type
         self.send_message(MessageType.Authenticate, packet)
+
+    def enqueue_audio(self, data: AudioData):
+        self._legacy_buffer_lock.acquire(True)
+        self._legacy_buffer.append(data)
+        self._legacy_buffer_lock.release()
+
+    def ready(self):
+        self.logger.debug("ControlStack: releasing ready lock")
+        try:
+            self._ready.release()
+        except RuntimeError:
+            pass
+
+    def is_ready(self):
+        self.logger.debug("ControlStack: checking if ready")
+        self._ready.acquire(True)
+        self._ready.release()
+        self.logger.debug("ControlStack: ready released")

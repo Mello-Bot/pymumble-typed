@@ -5,7 +5,8 @@ READ_BUFFER_SIZE: int = 4096
 SAMPLE_RATE: int = 48000
 SEQUENCE_DURATION: float = 0.01
 SEQUENCE_RESET_INTERVAL: int = 5
-
+BANDWIDTH = 96000
+CHANNELS = 2
 
 class CodecNotSupportedError(Exception):
     """Thrown when receiving an audio packet from an unsupported codec"""
@@ -29,3 +30,5 @@ class CodecProfile(str, Enum):
     Audio = "audio"
     Voip = "voip"
     RestrictedLowDelay = "restricted_lowdelay"
+
+

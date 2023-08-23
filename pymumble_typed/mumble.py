@@ -6,26 +6,25 @@ from pymumble_typed import MessageType
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
 
-import socket
 import struct
-from struct import pack
 
+from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
-    RequestBlob, ServerConfig
+    RequestBlob, ServerConfig, SuggestConfig
 
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
-from pymumble_typed.commands import Command, CommandQueue
+from pymumble_typed.commands import Command
 from pymumble_typed.messages import Message as MessageContainer
-from pymumble_typed.sound.soundoutput import SoundOutput
+from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
 
 from enum import IntEnum
-from threading import Lock, current_thread
-from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, AUDIO_PER_PACKET
+from threading import current_thread
+from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError
 
 
 class ClientType(IntEnum):
@@ -65,25 +64,23 @@ class Mumble:
         self.sound_receive = False
         self._callbacks = Callbacks(self)
 
-        self._ready_lock = Lock()
-        self._ready_lock.acquire()
-
         self.positional = None
-
-
-        # self.media_socket: SSLSocket | None = None
 
         self._bandwidth = Mumble.BANDWIDTH
         self._server_max_bandwidth = 0
-        # self.udp_active = False
 
         self.users: Users = Users(self)
         self.channels: Channels = Channels(self)
         self.settings = Settings()
-        self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self._bandwidth, stereo=self._stereo)
         self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, client_type,
-                                                   self.sound_output, self._logger)
+                                                   self._logger)
+        self._voice: VoiceStack = VoiceStack(self._control, self._logger)
+        self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
+
+    @property
+    def voice_connection(self):
+        return "udp" if self._voice.active else "tcp"
 
     @property
     def command_limit(self):
@@ -113,34 +110,37 @@ class Mumble:
         self._control.connect()
 
     def _init(self):
-        self._ready = False
-        self._ready_lock.acquire(False)
-
         self._bandwidth = Mumble.BANDWIDTH
-        self._server_max_bandwidth = 0
+        self._server_max_bandwidth = 96000
         # self.udp_active = False
 
         self.settings = Settings()
         self.users = Users(self)
         self.channels = Channels(self)
-        self.sound_output = SoundOutput(self, AUDIO_PER_PACKET, self._bandwidth, stereo=self._stereo)
-        self._control = self._control.reinit(self.sound_output)
+        if self._control:
+            self._control.disconnect()
+        self._control = self._control.reinit()
         self._control.set_control_message_dispatcher(self._dispatch_control_message)
         self._control.reconnect = self._reconnect
+        self._voice: VoiceStack = VoiceStack(self._control, self._logger)
+        self.voice = VoiceOutput(self._control, self._voice)
 
     def _dispatch_control_message(self, _type: int, message: bytes):
-        self._logger.debug(f"Received packet type: {_type}")
+        try:
+            self._logger.debug(f"Mumble: Received packet type: {MessageType(_type).name}")
+        except ValueError:
+            self._logger.debug(f"Mumble: Received packet type: {_type}")
         if _type == MessageType.UDPTunnel:
             if self.sound_receive:
                 self._sound_received(message)
         elif _type == MessageType.Version:
             packet = Version()
             packet.ParseFromString(message)
-            self._logger.debug(f"Received version: {packet.version_v1}")
+            self._logger.debug(f"Mumble: Received version: {packet.version_v1}")
         elif _type == MessageType.Authenticate:
             packet = Authenticate()
             packet.ParseFromString(message)
-            self._logger.debug(f"Received authenticate. Session: {packet.session}")
+            self._logger.debug(f"Mumble: Received authenticate. Session: {packet.session}")
         elif _type == MessageType.PingPacket:
             packet = PingPacket()
             packet.ParseFromString(message)
@@ -149,13 +149,13 @@ class Mumble:
             packet = Reject()
             packet.ParseFromString(message)
             self._control.status = Status.FAILED
-            self._ready_lock.release()
+            self._control.ready()
             raise ConnectionRejectedError(packet.reason)
         elif _type == MessageType.ServerSync:
             packet = ServerSync()
             packet.ParseFromString(message)
+            self._voice.sync()
             self.users.set_myself(packet.session)
-            self._server_max_bandwidth = packet.max_bandwidth
             self.set_bandwidth(packet.max_bandwidth)
             if self._control.status == Status.AUTHENTICATING:
                 self._control.status = Status.CONNECTED
@@ -165,7 +165,7 @@ class Mumble:
                 #  since this is set on client startup minimum is 5 to avoid excessively low limit
                 if len(self.users) > self._control.command_limit:
                     self._control.command_limit = len(self.users)
-                self._ready_lock.release()
+                self._control.ready()
                 self._callbacks.ready()
                 self._callbacks.dispatch("on_connect")
         elif _type == MessageType.ChannelRemove:
@@ -209,7 +209,8 @@ class Mumble:
         elif _type == MessageType.CryptSetup:
             packet = CryptSetup()
             packet.ParseFromString(message)
-            self._control.ping.send()
+            self._voice.crypt_setup(packet)
+            self._voice.ping()
         elif _type == MessageType.ContextActionModify:
             packet = ContextActionModify()
             packet.ParseFromString(message)
@@ -230,7 +231,6 @@ class Mumble:
         elif _type == MessageType.CodecVersion:
             packet = CodecVersion()
             packet.ParseFromString(message)
-            self.sound_output.set_default_codec(packet)
         elif _type == MessageType.UserStats:
             packet = UserStats()
             packet.ParseFromString(message)
@@ -240,23 +240,18 @@ class Mumble:
         elif _type == MessageType.ServerConfig:
             packet = ServerConfig()
             packet.ParseFromString(message)
-            for line in str(packet).split("\n"):
-                try:
-                    items = line.split(":")
-                    if items[0] == 'allow_html':
-                        self.settings.server_allow_html = items[1].strip() == 'true'
-                    elif items[0] == 'message_length':
-                        self.settings.server_max_message_length = int(items[1].strip())
-                    elif items[0] == 'image_message_length':
-                        self.settings.server_max_image_message_length = int(items[1].strip())
-                except:
-                    self._logger.error(f"Error while parsing server arguments: {str(packet)}", exc_info=True)
+            self._server_max_bandwidth = packet.max_bandwidth
+            if packet.HasField("allow_html"):
+                self.settings.server_allow_html = packet.allow_html
+            if packet.HasField("message_length"):
+                self.settings.server_max_message_length = packet.message_length
+            if packet.HasField("image_message_length"):
+                self.settings.server_max_image_message_length = packet.image_message_length
 
     def set_bandwidth(self, bandwidth: int):
         if self._server_max_bandwidth is not None:
             self._bandwidth = min(bandwidth, self._server_max_bandwidth)
-
-        self.sound_output.set_bandwidth(self._bandwidth)
+        self.voice.encoder.bandwidth = self._bandwidth
 
     def _sound_received(self, packet: bytes):
         pos = 0
@@ -323,8 +318,7 @@ class Mumble:
         self.sound_receive = value
 
     def is_ready(self):
-        self._ready_lock.acquire()
-        self._ready_lock.release()
+        self._control.is_ready()
 
     def execute_command(self, cmd: Command, blocking: bool = True):
         self.is_ready()
@@ -352,11 +346,15 @@ class Mumble:
     def reauthenticate(self, token):
         self._control.reauthenticate(token)
 
-    def send_audio(self, udp_packet):
-        tcp_packet = pack('!HL', MessageType.UDPTunnel.value, len(udp_packet)) + udp_packet
-        while len(tcp_packet) > 0:
-            sent = self._control.socket.send(tcp_packet)
-            self.logger.debug(f"Mumble: audio sent {sent}")
-            if sent < 0:
-                raise socket.error("Server socket error while sending audio")
-            tcp_packet = tcp_packet[sent:]
+    def set_whisper(self, target_ids: list[int], channel=False):
+        self.voice.target = 1 if channel else 2
+        command = VoiceTarget()
+        command.id = self.voice.target
+        command.targets.extend(target_ids)
+        self.execute_command(command)
+
+    def remove_whisper(self):
+        self.voice.target = 0
+        command = VoiceTarget()
+        command.id = self.voice.target
+        self.execute_command(command)
