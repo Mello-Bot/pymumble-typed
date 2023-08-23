@@ -23,8 +23,7 @@ class VoiceOutput:
         self._sequence_last_time = 0
         self._sequence = 0
 
-        self._thread = Thread(target=self.send_audio)
-        self._thread.start()
+        self._thread = Thread(target=self.send_audio, name="VoiceOutput:SendAudio")
 
     # Legacy code support
     def add_sound(self, pcm: bytes):
@@ -43,6 +42,9 @@ class VoiceOutput:
         for i in range(initial_offset, len(pcm), samples):
             self._buffer.append(pcm[i:i + samples])
         self._buffer_lock.release()
+        if not self._thread.is_alive():
+            self._thread = Thread(target=self.send_audio, name="VoiceOutput:SendAudio")
+            self._thread.start()
 
     def clear_buffer(self):
         self._buffer_lock.acquire(blocking=True)
@@ -56,7 +58,8 @@ class VoiceOutput:
 
     def send_audio(self):
         self._control.is_ready()
-        while self._control.is_connected():
+        timeout = False
+        while self._control.is_connected() and not timeout:
             audio_per_packet = self._encoder.audio_per_packet
             while len(self._buffer) > 0 and self._sequence_last_time + audio_per_packet <= time():
                 current_time = time()
@@ -88,7 +91,8 @@ class VoiceOutput:
                 audio.sequence = self._sequence
                 audio.positional = self.positional
                 self._voice.send_packet(audio)
-        sleep(0.01)
+            sleep(0.01)
+            timeout = time() - self._sequence_last_time > 0.1
 
     @property
     def encoder(self):

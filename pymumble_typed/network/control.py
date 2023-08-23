@@ -57,7 +57,7 @@ class ControlStack:
         self.ping: Ping = Ping()
         self.receive_buffer: bytes = bytes()
         self._dispatch_control_message = lambda _, __: None
-        self.thread = Thread(target=self.loop)
+        self.thread = Thread(target=self.loop, name="ControlStack:Loop")
 
         self._legacy_buffer: list[AudioData] = []
 
@@ -144,7 +144,7 @@ class ControlStack:
             raise exc
         self.status = Status.AUTHENTICATING
         if not self.thread.is_alive():
-            self.thread = Thread(target=self.loop)
+            self.thread = Thread(target=self.loop, name="ControlStack:ListenLoop")
             self.thread.start()
 
     def on_disconnect(self, func: Callable[[], None]):
@@ -234,6 +234,7 @@ class ControlStack:
                 self.logger.debug("ControlStack: Handling disconnection")
                 self.socket.close()
                 self.status = Status.NOT_CONNECTED
+        self._ready.release()
         self.logger.debug(f"ControlStack: Exiting. Status: {self.status} Exit: {exit_}")
 
     def loop(self):
@@ -265,6 +266,10 @@ class ControlStack:
             self.logger.debug("ControlStack: Trying to close already close socket!")
 
     def disconnect(self):
+        try:
+            self._ready.release()
+        except RuntimeError:
+            self.logger.debug("ControlStack: ready lock already released")
         self._disconnect = True
         if self.thread.is_alive():
             self.thread.join(timeout=10)
@@ -300,3 +305,6 @@ class ControlStack:
         self._ready.acquire(True)
         self._ready.release()
         self.logger.debug("ControlStack: ready released")
+
+    def __del__(self):
+        self.disconnect()

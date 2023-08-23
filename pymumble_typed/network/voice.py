@@ -26,7 +26,7 @@ class VoiceStack:
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.control = control
         self.active = False
-        self._recv_thread = Thread(target=self._listen)
+        self._recv_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
         self._crypt_lock = Lock()
         self._last_lost = 0
 
@@ -63,7 +63,7 @@ class VoiceStack:
         self._recv_thread.start()
 
     def sync(self):
-        thread = Thread(target=self._sync)
+        thread = Thread(target=self._sync, name="VoiceStack:CryptSetup")
         thread.start()
 
     def ping(self, enforce=False, request_extended_information=False):

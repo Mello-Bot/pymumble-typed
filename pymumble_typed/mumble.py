@@ -12,7 +12,7 @@ from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
-    RequestBlob, ServerConfig, SuggestConfig
+    RequestBlob, ServerConfig
 
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
