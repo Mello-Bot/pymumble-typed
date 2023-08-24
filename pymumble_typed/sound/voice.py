@@ -42,9 +42,23 @@ class VoiceOutput:
         for i in range(initial_offset, len(pcm), samples):
             self._buffer.append(pcm[i:i + samples])
         self._buffer_lock.release()
-        if not self._thread.is_alive():
-            self._thread = Thread(target=self.send_audio, name="VoiceOutput:SendAudio")
-            self._thread.start()
+        self.send_audio()
+
+    def _update_sequence(self):
+        audio_per_packet = self._encoder.audio_per_packet
+        current_time = time()
+        if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time:
+            self._sequence = 0
+            self._sequence_start_time = current_time
+            self._sequence_last_time = current_time
+        # give some slack (2*audio_per_frame) before interrupting a continuous sequence
+        elif self._sequence_last_time + (audio_per_packet * 2) <= current_time:
+            # calculating sequence after a pause
+            self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
+            self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
+        else:  # continuous sound
+            self._sequence += int(audio_per_packet / SEQUENCE_DURATION)
+            self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
     def clear_buffer(self):
         self._buffer_lock.acquire(blocking=True)
@@ -58,28 +72,12 @@ class VoiceOutput:
 
     def send_audio(self):
         self._control.is_ready()
-        timeout = False
-        while self._control.is_connected() and not timeout:
-            audio_per_packet = self._encoder.audio_per_packet
+        audio_per_packet = self._encoder.audio_per_packet
+        while len(self._buffer) > 0:
             while len(self._buffer) > 0 and self._sequence_last_time + audio_per_packet <= time():
-                current_time = time()
-                # waited enough, resetting sequence to 0
-                if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time:
-                    self._sequence = 0
-                    self._sequence_start_time = current_time
-                    self._sequence_last_time = current_time
-                # give some slack (2*audio_per_frame) before interrupting a continuous sequence
-                elif self._sequence_last_time + (audio_per_packet * 2) <= current_time:
-                    # calculating sequence after a pause
-                    self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
-                    self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
-                else:  # continuous sound
-                    self._sequence += int(audio_per_packet / SEQUENCE_DURATION)
-                    self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
-
+                self._update_sequence()
                 audio = AudioData()
                 audio_encoded = 0
-
                 while len(self._buffer) > 0 and audio_encoded < audio_per_packet:
                     self._buffer_lock.acquire()
                     pcm = self._buffer.pop(0)
@@ -92,7 +90,6 @@ class VoiceOutput:
                 audio.positional = self.positional
                 self._voice.send_packet(audio)
             sleep(0.01)
-            timeout = time() - self._sequence_last_time > 0.1
 
     @property
     def encoder(self):

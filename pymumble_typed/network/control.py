@@ -289,6 +289,8 @@ class ControlStack:
         self.send_message(MessageType.Authenticate, packet)
 
     def enqueue_audio(self, data: AudioData):
+        while len(self._legacy_buffer) > 64:
+            sleep(0.01)  # FIXME: buffer is growing too much, busy waiting
         self._legacy_buffer_lock.acquire(True)
         self._legacy_buffer.append(data)
         self._legacy_buffer_lock.release()
