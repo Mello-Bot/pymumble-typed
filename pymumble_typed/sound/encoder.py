@@ -1,11 +1,12 @@
 from threading import Lock
 
+from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.sound import AUDIO_PER_PACKET, SAMPLE_RATE, CodecProfile, BANDWIDTH, CHANNELS
 from opuslib import Encoder as OpusEncoder, OpusError
 
 
 class Encoder:
-    def __init__(self):
+    def __init__(self, voice: VoiceStack):
         self._audio_per_packet: float = AUDIO_PER_PACKET
         self._sample_rate: int = SAMPLE_RATE
         self._channels: int = CHANNELS
@@ -15,11 +16,16 @@ class Encoder:
         self._bandwidth: int = BANDWIDTH
         self._samples = int(self.encoder_framesize * self._sample_rate * self.sample_size)
         self._encoder_ready = Lock()
+        self._voice = voice
+        voice.on_protocol_switch(self._recalc_bitrate)
 
     def _update_encoder(self):
         self._encoder_ready.acquire(blocking=True)
         self._encoder: OpusEncoder = OpusEncoder(self._sample_rate, self._channels, self._codec_profile)
         self._encoder_ready.release()
+
+    def _recalc_bitrate(self, _: bool):
+        self._encoder.bitrate = self._calc_bitrate()
 
     @property
     def encoder_framesize(self):
@@ -52,6 +58,18 @@ class Encoder:
     def samples(self):
         return self._samples
 
+    def _calc_bitrate(self):
+        overhead_per_packet = 20
+        # FIXME: ??? self._audio_per_packet == self.encoder_framesize, results 1
+        overhead_per_packet += (3 * int(self._audio_per_packet) / self.encoder_framesize)
+        if self._voice.active:
+            overhead_per_packet += 12
+        else:
+            overhead_per_packet += 20  # TCP Header
+            overhead_per_packet += 6  # TCPTunnel Encapsulation
+        overhead_per_second = int(overhead_per_packet * 8 / self._audio_per_packet)
+        return self._bandwidth - overhead_per_second
+
     @property
     def bandwidth(self):
         return self._bandwidth
@@ -59,14 +77,7 @@ class Encoder:
     @bandwidth.setter
     def bandwidth(self, bandwidth: int):
         self._bandwidth = bandwidth
-        overhead_per_packet = 20
-        # FIXME: ??? self._audio_per_packet == self.encoder_framesize, results 1
-        overhead_per_packet += (3 * int(self._audio_per_packet) / self.encoder_framesize)
-        # TODO: UDP Code
-        overhead_per_packet += 20  # TCP Header
-        overhead_per_packet += 6  # TCPTunnel Encapsulation
-        overhead_per_second = int(overhead_per_packet * 8 / self._audio_per_packet)
-        self._encoder.bitrate = self._bandwidth - overhead_per_second
+        self._encoder.bitrate = self._calc_bitrate()
 
     @property
     def audio_per_packet(self):
@@ -108,3 +119,7 @@ class Encoder:
     def codec_profile(self, profile: CodecProfile):
         self._codec_profile = profile
         self._update_encoder()
+
+    @property
+    def bitrate(self):
+        return self._calc_bitrate()

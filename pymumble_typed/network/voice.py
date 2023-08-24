@@ -10,6 +10,7 @@ from pymumble_typed.network.udp_data import PingData, UDPData
 
 if TYPE_CHECKING:
     from logging import Logger
+    from typing import Callable
 
 from pymumble_typed.crypto.ocb2 import CryptStateOCB2
 from socket import socket, AF_INET, SOCK_DGRAM, timeout, gaierror
@@ -29,6 +30,10 @@ class VoiceStack:
         self._recv_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
         self._crypt_lock = Lock()
         self._last_lost = 0
+        self._listeners: list[Callable[[bool], None]] = []
+
+    def on_protocol_switch(self, func: Callable[[bool], None]):
+        self._listeners.append(func)
 
     def crypt_setup(self, message: CryptSetup):
         self.logger.debug("VoiceStack: setting up crypto")
@@ -48,6 +53,10 @@ class VoiceStack:
             self.control.send_message(MessageType.CryptSetup, packet)
         self._crypt_lock.release()
 
+    def _signal_protocol_change(self):
+        for listener in self._listeners:
+            listener(self.active)
+
     def _sync(self):
         self.socket.settimeout(3)
         self.ping(True, True)
@@ -56,10 +65,12 @@ class VoiceStack:
         except timeout:
             self.logger.warning("VoiceStack: Couldn't initialize UDP connection. Falling back to TCP.")
             self.active = False
+            self._signal_protocol_change()
             return
         self.ocb.decrypt(response, len(response) + 4)
         self.socket.settimeout(None)
         self.active = True
+        self._signal_protocol_change()
         self._recv_thread.start()
 
     def sync(self):

@@ -12,7 +12,7 @@ class VoiceOutput:
     def __init__(self, control: ControlStack, voice: VoiceStack):
         self.positional = [0, 0, 0]
         self._buffer: list[bytes] = []
-        self._encoder: Encoder = Encoder()
+        self._encoder: Encoder = Encoder(voice)
         self._buffer_lock = Lock()
         self.target: int = 0
 
