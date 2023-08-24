@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from threading import Thread, Lock
+from time import sleep
 from typing import TYPE_CHECKING
 
 from pymumble_typed import MessageType
 from pymumble_typed.network.control import ControlStack
 
 from pymumble_typed.network.udp_data import PingData, UDPData
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -59,7 +61,7 @@ class VoiceStack:
 
     def _sync(self):
         self.socket.settimeout(3)
-        self.ping(True, True)
+        self.ping(True, False)
         try:
             response = self.socket.recv(2048)
         except timeout:
@@ -67,7 +69,7 @@ class VoiceStack:
             self.active = False
             self._signal_protocol_change()
             return
-        self.ocb.decrypt(response, len(response) + 4)
+        self.ocb.decrypt(response)
         self.socket.settimeout(None)
         self.active = True
         self._signal_protocol_change()
@@ -82,11 +84,11 @@ class VoiceStack:
         packet.request_extended_information = request_extended_information
         self.send_packet(packet, enforce)
 
-    def send_packet(self, data: UDPData, enforce=False):
+    def send_packet(self, data: UDPData, enforce=True):
         if self.active or enforce:
             self.logger.debug(f"VoiceStack: sending {data.type.name}")
             self._crypt_lock.acquire(True)
-            encrypted = self.ocb.encrypt(data.legacy_udp_packet)
+            encrypted = self.ocb.encrypt(data.serialized_udp_packet)
             self._crypt_lock.release()
             try:
                 self.socket.sendto(encrypted, self.addr)
@@ -98,14 +100,17 @@ class VoiceStack:
             self.control.ping.send()
 
     def _listen(self):
-        self.socket.settimeout(10)
         while not self.exit and self.control.is_connected():
             try:
                 response = self.socket.recv(2048)
-            except timeout:
-                pass
+                decrypted = self.ocb.decrypt(response)
+                packet = Audio()
+                packet.ParseFromString(decrypted[1:])
+                # TODO: handling incoming audio packets
+            except BlockingIOError:
+                self.logger.error("VoiceStack: BlockingIOError, packet may will be lost in the next seconds")
+                sleep(1)
 
     def stop(self):
         self.exit = True
         self._recv_thread.join()
-

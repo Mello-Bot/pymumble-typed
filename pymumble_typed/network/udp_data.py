@@ -51,6 +51,18 @@ class UDPData:
 class PingData(UDPData):
     def __init__(self):
         super().__init__()
+        self.time = time_ns()
+
+    @property
+    def udp_packet(self):
+        packet = Ping()
+        packet.timestamp = self.time
+        packet.request_extended_information = self.request_extended_information
+        return packet
+
+    @property
+    def serialized_udp_packet(self):
+        return bytes((self.type.value,)) + self.udp_packet.SerializeToString()
 
 
 class AudioData(UDPData):

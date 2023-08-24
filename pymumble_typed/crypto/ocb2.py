@@ -1,3 +1,5 @@
+# 1st Source:
+# 2nd Source: https://github.com/ianling/mumpy/blob/dev/mumpy/mumblecrypto.py
 from math import ceil
 from struct import pack, unpack
 
@@ -75,8 +77,9 @@ class CryptStateOCB2:
         self.decrypt_iv = decrypt_iv
 
     def encrypt(self, source: bytes):
-        self.encrypt_iv = increment_iv(self.encrypt_iv)
-
+        nonce = int.from_bytes(self.encrypt_iv, byteorder="little")
+        nonce += 1
+        self.encrypt_iv = nonce.to_bytes(AES_BLOCK_SIZE, byteorder="little")
         dst, tag = ocb_encrypt(self._aes, source, bytes(self.encrypt_iv))
 
         # dst[0] = encrypt_iv[0];
@@ -85,7 +88,7 @@ class CryptStateOCB2:
         # dst[3] = tag[2];
         return bytes((self.encrypt_iv[0], tag[0], tag[1], tag[2])) + dst
 
-    def decrypt(self, source: bytes, len_plain: int) -> bytes:
+    def decrypt(self, source: bytes) -> bytes:
         if len(source) < 4:
             raise DecryptFailedException("Source <4 bytes long!")
 
@@ -146,7 +149,7 @@ class CryptStateOCB2:
                 self.decrypt_iv = save_iv
                 raise DecryptFailedException("decrypt_iv in history")
         try:
-            dst, tag = ocb_decrypt(self._aes, source[4:], bytes(self.decrypt_iv), len_plain)
+            dst, tag = ocb_decrypt(self._aes, source[4:], bytes(self.decrypt_iv), len(source) - 4)
         except:
             self.decrypt_iv = save_iv
             raise DecryptFailedException("Decryption failed")
@@ -179,7 +182,7 @@ def S2(block: bytes) -> bytes:
 
 
 def S3(block: bytes) -> bytes:
-    return xor(S2(block), block)
+    return xor(block, S2(block))
 
 
 def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> [bytes, bytes]:
@@ -223,13 +226,14 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> [byt
     # ZERO(tmp);
     # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
     tmp = pack('>QQ', 0, length * 8)
+
     tmp = xor(tmp, delta)  # XOR(tmp, tmp, delta);
     pad = aes.encrypt(tmp)  # AESencrypt(tmp, pad, raw_key);
     tmp = plain[pos:pos + length]
     tmp += pad[length:AES_BLOCK_SIZE]
     checksum = xor(checksum, tmp)  # XOR(checksum, checksum, tmp);
     tmp = xor(pad, tmp)  # XOR(tmp, pad, tmp);
-    encrypted[pos:] = tmp  # memcpy(encrypted, tmp, len);
+    encrypted[pos:] = tmp[0:length]  # memcpy(encrypted, tmp, len);
     """
     delta = S3(delta)  # S3(delta);
     tmp = xor(delta, checksum)  # XOR(tmp, delta, checksum);
@@ -260,7 +264,11 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
     len_remaining = len_plain - pos
 
     delta = S2(delta)  # S2(delta);
-    tmp = pack('>QQ', 0, len_remaining * 8)  # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
+
+    # ZERO(tmp);
+    # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
+    tmp = pack('>QQ', 0, len_remaining * 8)
+
     tmp = xor(tmp, delta)  # XOR(tmp, tmp, delta);
     pad = aes.encrypt(tmp)  # AESencrypt(tmp, pad, raw_key);
     encrypted_zeropad = encrypted[pos:] + bytes(AES_BLOCK_SIZE - len_remaining)
@@ -301,8 +309,7 @@ def decrement_iv(iv: bytearray, start: int = 0) -> bytearray:
 
 
 def xor(a: bytes, b: bytes) -> bytes:
-    length = min(len(a), len(b))
-    a_ = int.from_bytes(a[0:length], byteorder="little")
-    b_ = int.from_bytes(b[0:length], byteorder="little")
+    a_ = int.from_bytes(a[0:AES_BLOCK_SIZE], byteorder="little")
+    b_ = int.from_bytes(b[0:AES_BLOCK_SIZE], byteorder="little")
     res = a_ ^ b_
-    return res.to_bytes(byteorder="little", length=len(a), signed=False)
+    return res.to_bytes(byteorder="little", length=AES_BLOCK_SIZE, signed=False)
