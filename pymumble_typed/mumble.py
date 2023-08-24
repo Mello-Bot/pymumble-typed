@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from logging import Logger, ERROR, DEBUG, StreamHandler
 
-from pymumble_typed import MessageType
+from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
 
 import struct
 
 from pymumble_typed.network.voice import VoiceStack
-from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping as UdpPingPacket
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
@@ -123,16 +123,34 @@ class Mumble:
         self._control.set_control_message_dispatcher(self._dispatch_control_message)
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
+        self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
         self.voice = VoiceOutput(self._control, self._voice)
+
+    def _dispatch_voice_message(self, _type: int, message: bytes):
+        try:
+            self._logger.debug(f"Mumble: Received UDP packet type: {UdpMessageType(_type).name}")
+        except ValueError:
+            self._logger.debug(f"Mumble: Received UDP packet type: {_type}")
+
+        if _type == UdpMessageType.Audio and self.sound_receive:
+            packet = Audio()
+            packet.ParseFromString(message)
+            # TODO: handle incoming audio packets
+        elif _type == UdpMessageType.Ping:
+            packet = UdpPingPacket()
+            packet.ParseFromString(message)
+            if packet.max_bandwidth_per_user:
+                self._server_max_bandwidth = packet.max_bandwidth_per_user
+                self._logger.debug(f"Mumble: updated server max bandwidth per client {self._server_max_bandwidth}")
+            self._voice.ping_response(packet)
 
     def _dispatch_control_message(self, _type: int, message: bytes):
         try:
-            self._logger.debug(f"Mumble: Received packet type: {MessageType(_type).name}")
+            self._logger.debug(f"Mumble: Received TCP packet type: {MessageType(_type).name}")
         except ValueError:
-            self._logger.debug(f"Mumble: Received packet type: {_type}")
-        if _type == MessageType.UDPTunnel:
-            if self.sound_receive:
-                self._sound_received(message)
+            self._logger.debug(f"Mumble: Received TCP packet type: {_type}")
+        if _type == MessageType.UDPTunnel and self.sound_receive:
+            self._sound_received(message)
         elif _type == MessageType.Version:
             packet = Version()
             packet.ParseFromString(message)

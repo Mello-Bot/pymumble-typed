@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from threading import Thread, Lock
-from time import sleep
+from time import sleep, time, time_ns
 from typing import TYPE_CHECKING
 
-from pymumble_typed import MessageType
+from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.network.control import ControlStack
 
 from pymumble_typed.network.udp_data import PingData, UDPData
-from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -29,13 +29,23 @@ class VoiceStack:
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.control = control
         self.active = False
-        self._recv_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
+        self._listen_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
+        self._conn_check_thread = Thread(target=self._conn_check, name="ControlStack:ConnCheck")
         self._crypt_lock = Lock()
         self._last_lost = 0
-        self._listeners: list[Callable[[bool], None]] = []
+        self._protocol_switch_listeners: list[Callable[[bool], None]] = []
+        self._dispatcher: Callable[[UdpMessageType, bytes], None] = lambda _, __: None
+        self.last_ping: PingData = PingData()
+        self.ping_sent = 0
+        self.ping_recv = 0
+        self.ping_lost = 0
+        self._extended_info = False
+        self._last_good_ping = time()
+        self.ping_average: float = 0.
+        self.ping_variance: float = 0.
 
     def on_protocol_switch(self, func: Callable[[bool], None]):
-        self._listeners.append(func)
+        self._protocol_switch_listeners.append(func)
 
     def crypt_setup(self, message: CryptSetup):
         self.logger.debug("VoiceStack: setting up crypto")
@@ -56,7 +66,7 @@ class VoiceStack:
         self._crypt_lock.release()
 
     def _signal_protocol_change(self):
-        for listener in self._listeners:
+        for listener in self._protocol_switch_listeners:
             listener(self.active)
 
     def _sync(self):
@@ -68,12 +78,20 @@ class VoiceStack:
             self.logger.warning("VoiceStack: Couldn't initialize UDP connection. Falling back to TCP.")
             self.active = False
             self._signal_protocol_change()
+            self._conn_check_thread.start()
             return
-        self.ocb.decrypt(response)
+        self._crypt_lock.acquire(True)
+        decrypted = self.ocb.decrypt(response)
+        self._dispatcher(decrypted[0], decrypted[1:])
+        self._crypt_lock.release()
+        self._conn_check_thread.start()
+
+    def enable_udp(self):
         self.socket.settimeout(None)
         self.active = True
         self._signal_protocol_change()
-        self._recv_thread.start()
+        self._listen_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
+        self._listen_thread.start()
 
     def sync(self):
         thread = Thread(target=self._sync, name="VoiceStack:CryptSetup")
@@ -82,9 +100,11 @@ class VoiceStack:
     def ping(self, enforce=False, request_extended_information=False):
         packet = PingData()
         packet.request_extended_information = request_extended_information
+        self.ping_sent += 1
+        self.last_ping = packet
         self.send_packet(packet, enforce)
 
-    def send_packet(self, data: UDPData, enforce=True):
+    def send_packet(self, data: UDPData, enforce=False):
         if self.active or enforce:
             self.logger.debug(f"VoiceStack: sending {data.type.name}")
             self._crypt_lock.acquire(True)
@@ -100,17 +120,65 @@ class VoiceStack:
             self.control.ping.send()
 
     def _listen(self):
-        while not self.exit and self.control.is_connected():
+        while self.active and not self.exit and self.control.is_connected():
             try:
                 response = self.socket.recv(2048)
                 decrypted = self.ocb.decrypt(response)
-                packet = Audio()
-                packet.ParseFromString(decrypted[1:])
-                # TODO: handling incoming audio packets
+                self._dispatcher(decrypted[0], decrypted[1:])
             except BlockingIOError:
                 self.logger.error("VoiceStack: BlockingIOError, packet may will be lost in the next seconds")
                 sleep(1)
+        self.logger.warning(
+            f"VoiceStack: Exiting ListenLoop. Active: {self.active} Exit: {self.exit} Connected: {self.control.is_connected()}")
+
+    def ping_response(self, ping: Ping):
+        ping_time = None
+        if ping.max_bandwidth_per_user:
+            self._extended_info = True
+        if self.last_ping.time != ping.timestamp:
+            self.logger.debug("VoiceStack: handling lost UDP ping")
+            self.ping_lost += 1
+            self.ping_recv += 1
+        elif not self.active:
+            self._last_good_ping = time()
+            self.logger.debug("VoiceStack: handling UDP ping, resuming inactive connection")
+            self.ping_recv = self.ping_sent
+            self.enable_udp()
+            ping_time = time_ns() - ping.timestamp
+        else:
+            self._last_good_ping = time()
+            self.logger.debug("VoiceStack: handling UDP ping")
+            self.ping_recv += 1
+            ping_time = time_ns() - ping.timestamp
+        if ping_time:
+            try:
+                ping_time = ping_time / 1000000
+                self.ping_average = (self.ping_average * (self.ping_recv - 1) + ping_time) / self.ping_recv
+            except ZeroDivisionError:
+                pass
+        self.control.ping.udp_good = self.ping_recv - self.ping_lost
+        self.control.ping.udp_lost = 0  # TODO: handle late ping packets
+        self.control.ping.udp_lost = self.ping_lost
+        self.control.ping.udp_packets = self.ping_sent
+        self.control.ping.udp_ping_average = self.ping_average
+        self.control.ping.udp_ping_variance = self.ping_variance
+
+    def _conn_check(self):
+        while not self.exit and self.control.is_connected():
+            sleep(10)
+            if time() - self._last_good_ping > 15:
+                self.active = False
+                self._signal_protocol_change()
+            self.ping(True, False)  # not self._extended_info)
 
     def stop(self):
         self.exit = True
-        self._recv_thread.join()
+        self._listen_thread.join()
+        self._conn_check_thread.join()
+
+    def set_voice_message_dispatcher(self, _dispatch_voice_message: Callable[[UdpMessageType, bytes], None]):
+        self._dispatcher = _dispatch_voice_message
+
+    def __del__(self):
+        self.exit = True
+        self.active = False
