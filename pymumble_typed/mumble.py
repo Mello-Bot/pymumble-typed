@@ -13,7 +13,7 @@ from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping as UdpPingPacket
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
-    RequestBlob, ServerConfig
+    RequestBlob, ServerConfig, UDPTunnel
 
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
@@ -61,11 +61,9 @@ class Mumble:
         self.sound_receive = False
         self._callbacks = Callbacks(self)
 
-        self.positional = None
-
         self._bandwidth = BANDWIDTH
         self._server_max_bandwidth = 0
-
+        self._server_version = (0, 0, 0)
         self.users: Users = Users(self)
         self.channels: Channels = Channels(self)
         self.settings = Settings()
@@ -135,7 +133,7 @@ class Mumble:
         if _type == UdpMessageType.Audio and self.sound_receive:
             packet = Audio()
             packet.ParseFromString(message)
-            # TODO: handle incoming audio packets
+            self._sound_received(packet)
         elif _type == UdpMessageType.Ping:
             packet = UdpPingPacket()
             packet.ParseFromString(message)
@@ -150,7 +148,14 @@ class Mumble:
         except ValueError:
             self._logger.debug(f"Mumble: Received TCP packet type: {_type}")
         if _type == MessageType.UDPTunnel and self.sound_receive:
-            self._sound_received(message)
+            if self._server_version < (1, 5, 0):
+                self._legacy_sound_received(message)
+            else:
+                packet = UDPTunnel()
+                packet.ParseFromString(message)
+                udp_packet = Audio()
+                udp_packet.ParseFromString(packet.packet)
+                self._sound_received(udp_packet)
         elif _type == MessageType.Version:
             packet = Version()
             packet.ParseFromString(message)
@@ -272,7 +277,7 @@ class Mumble:
             self._bandwidth = min(bandwidth, self._server_max_bandwidth)
         self.voice.encoder.bandwidth = self._bandwidth
 
-    def _sound_received(self, packet: bytes):
+    def _legacy_sound_received(self, packet: bytes):
         pos = 0
 
         (header,) = struct.unpack("!B", bytes([packet[pos]]))
@@ -318,8 +323,19 @@ class Mumble:
                 except CodecNotSupportedError:
                     self._logger.error("Codec not supported", exc_info=True)
                 except KeyError:
-                    pass
+                    self._logger.error(f"Invalid user session {session.value}")
             pos += size
+
+    def _sound_received(self, packet: Audio):
+        try:
+            user = self.users[packet.sender_session]
+            sound = user.sound.add(packet.opus_data, packet.frame_number, AudioType.OPUS, packet.target)
+            self._logger.debug(f"Mumble: Decoded audio {sound}")
+            if sound is None:
+                return
+            self._callbacks.dispatch("on_sound_received", user, sound)
+        except KeyError:
+            self._logger.error(f"Invalid user session {packet.sender_session}")
 
     def set_application_string(self, string: str):
         self._control.set_application_string(string)
@@ -377,3 +393,4 @@ class Mumble:
         command = VoiceTarget()
         command.id = self.voice.target
         self.execute_command(command)
+

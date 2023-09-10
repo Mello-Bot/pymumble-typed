@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from threading import Lock
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from logging import Logger
+
+from threading import Lock
 
 from opuslib import Decoder
 
 from pymumble_typed.sound import SAMPLE_RATE, AudioType, READ_BUFFER_SIZE, SEQUENCE_DURATION
-
-
-if TYPE_CHECKING:
-    from pymumble_typed.mumble import Mumble
-
 from collections import deque
 
 from time import time
@@ -43,20 +42,34 @@ class SoundChunk:
 
 
 class SoundQueue:
-    def __init__(self, mumble: Mumble):
-        self._mumble = mumble
+    def __init__(self, logger: Logger):
+        self._logger = logger
+
+    def add(self, audio: bytes, sequence: int, _type: AudioType, target: int):
+        pass
+
+    def has_sound(self) -> bool:
+        return False
+
+    def get_sound(self, duration: float) -> bytes:
+        return b''
+
+    def pop(self):
+        return b''
+
+
+class LegacySoundQueue(SoundQueue):
+    def __init__(self, logger: Logger):
+        super().__init__(logger)
         self._queue: deque[SoundChunk] = deque()
         self._start_sequence = None
         self._start_time = time()
         self._lock = Lock()
         self.decoders = {
-            AudioType.OPUS: Decoder(SAMPLE_RATE, 1)
+            AudioType.OPUS: Decoder(SAMPLE_RATE, 2)
         }
 
     def add(self, audio, sequence, _type: AudioType, target):
-        if not self._mumble.sound_receive:
-            return None
-
         self._lock.acquire()
         try:
             pcm = self.decoders[_type].decode(audio, READ_BUFFER_SIZE)
@@ -70,9 +83,9 @@ class SoundQueue:
             sound = SoundChunk(pcm, sequence, calculated_time, _type, target)
             return sound
         except KeyError:
-            self._mumble.logger.error("Invalid decoder")
+            self._logger.error("Invalid decoder")
         except Exception:
-            self._mumble.logger.error("Error while decoding audio", exc_info=True)
+            self._logger.error("Error while decoding audio", exc_info=True)
         finally:
             self._lock.release()
 

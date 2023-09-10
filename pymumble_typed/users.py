@@ -10,14 +10,14 @@ if TYPE_CHECKING:
 from struct import unpack
 from threading import Lock
 
-from pymumble_typed.sound.soundqueue import SoundQueue
+from pymumble_typed.sound.soundqueue import LegacySoundQueue
 from pymumble_typed.protobuf.Mumble_pb2 import RequestBlob
 from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser
 
 
 class User:
     def __init__(self, mumble: Mumble, packet: UserState):
-        self.sound = SoundQueue(mumble)
+        self.sound = LegacySoundQueue(mumble.logger)
         self._mumble: Mumble = mumble
         self.hash: str = packet.hash
         self.session: int = packet.session
