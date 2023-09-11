@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from logging import Logger, ERROR, DEBUG, StreamHandler
+from typing_extensions import TypedDict
 
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.network import ConnectionRejectedError
@@ -33,11 +34,10 @@ class ClientType(IntEnum):
     BOT = 1
 
 
-class Settings:
-    def __init__(self):
-        self.server_allow_html = True
-        self.server_max_message_length = 5000
-        self.server_max_image_message_length = 131072
+class Settings(TypedDict):
+    server_allow_html: bool
+    server_max_message_length: int
+    server_max_image_message_length: int
 
 
 class Mumble:
@@ -66,7 +66,8 @@ class Mumble:
         self._server_version = (0, 0, 0)
         self.users: Users = Users(self)
         self.channels: Channels = Channels(self)
-        self.settings = Settings()
+        self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
+                                 server_max_image_message_length=131072)
         self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, client_type,
                                                    self._logger)
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
@@ -112,7 +113,8 @@ class Mumble:
         self._bandwidth = BANDWIDTH
         self._server_max_bandwidth = BANDWIDTH
 
-        self.settings = Settings()
+        self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
+                                 server_max_image_message_length=131072)
         self.users = Users(self)
         self.channels = Channels(self)
         if self._control:
@@ -266,11 +268,11 @@ class Mumble:
             if packet.HasField("max_bandwidth"):
                 self._server_max_bandwidth = packet.max_bandwidth
             if packet.HasField("allow_html"):
-                self.settings.server_allow_html = packet.allow_html
+                self.settings["server_allow_html"] = packet.allow_html
             if packet.HasField("message_length"):
-                self.settings.server_max_message_length = packet.message_length
+                self.settings["server_max_message_length"] = packet.message_length
             if packet.HasField("image_message_length"):
-                self.settings.server_max_image_message_length = packet.image_message_length
+                self.settings["server_max_image_message_length"] = packet.image_message_length
 
     def set_bandwidth(self, bandwidth: int):
         if self._server_max_bandwidth is not None:
@@ -364,11 +366,10 @@ class Mumble:
         return lock
 
     def get_max_message_length(self) -> int:
-        return self.settings.server_max_message_length
+        return self.settings["server_max_message_length"]
 
     def get_max_image_length(self) -> int:
-        return self.settings.server_max_message_length
-
+        return self.settings["server_max_message_length"]
     def denial_type(self, name: str):
         return PermissionDenied.DenyType.Name(name)
 
