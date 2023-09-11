@@ -370,8 +370,6 @@ class Mumble:
 
     def get_max_image_length(self) -> int:
         return self.settings["server_max_message_length"]
-    def denial_type(self, name: str):
-        return PermissionDenied.DenyType.Name(name)
 
     def stop(self):
         self._control.disconnect()
