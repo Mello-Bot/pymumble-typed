@@ -42,3 +42,4 @@ class Decoder(Thread):
 
     def __del__(self):
         self.alive = False
+        self._process.kill()
