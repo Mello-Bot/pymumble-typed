@@ -10,7 +10,6 @@ from threading import Lock
 from opuslib import Decoder
 
 from pymumble_typed.sound import SAMPLE_RATE, AudioType, READ_BUFFER_SIZE, SEQUENCE_DURATION
-from collections import deque
 
 from time import time
 
@@ -48,20 +47,10 @@ class SoundQueue:
     def add(self, audio: bytes, sequence: int, _type: AudioType, target: int):
         pass
 
-    def has_sound(self) -> bool:
-        return False
-
-    def get_sound(self, duration: float) -> bytes:
-        return b''
-
-    def pop(self):
-        return b''
-
 
 class LegacySoundQueue(SoundQueue):
     def __init__(self, logger: Logger):
         super().__init__(logger)
-        self._queue: deque[SoundChunk] = deque()
         self._start_sequence = None
         self._start_time = time()
         self._lock = Lock()
@@ -88,23 +77,3 @@ class LegacySoundQueue(SoundQueue):
             self._logger.error("Error while decoding audio", exc_info=True)
         finally:
             self._lock.release()
-
-    def has_sound(self):
-        return len(self._queue) > 0
-
-    def get_sound(self, duration: float = None):
-        self._lock.acquire()
-        result = None
-        if self.has_sound():
-            if duration is None or self.pop().duration <= duration:
-                result = self._queue.pop()
-            else:
-                result = self.pop().extract_sound(duration)
-        self._lock.release()
-        return result
-
-    def pop(self):
-        try:
-            return self._queue.pop()
-        except IndexError:
-            return None

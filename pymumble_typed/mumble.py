@@ -393,4 +393,3 @@ class Mumble:
         command = VoiceTarget()
         command.id = self.voice.target
         self.execute_command(command)
-
