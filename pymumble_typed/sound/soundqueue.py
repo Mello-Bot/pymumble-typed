@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from logging import Logger
 
 from threading import Lock
 
-from opuslib import Decoder
-
-from pymumble_typed.sound import SAMPLE_RATE, AudioType, READ_BUFFER_SIZE, SEQUENCE_DURATION
+from pymumble_typed.sound import SAMPLE_RATE, AudioType, SEQUENCE_DURATION
+from pymumble_typed.sound.decoder import Decoder
 
 from time import time
 
@@ -49,30 +48,30 @@ class SoundQueue:
 
 
 class LegacySoundQueue(SoundQueue):
-    def __init__(self, logger: Logger):
+    def __init__(self, callback: Callable[[SoundChunk], None], logger: Logger):
         super().__init__(logger)
         self._start_sequence = None
         self._start_time = time()
         self._lock = Lock()
-        self._decoder = Decoder(SAMPLE_RATE, 2)
+        self._decoder = Decoder(self._on_decoded, logger)
+        self._callback = callback
 
-    def add(self, audio, sequence, _type: AudioType, target):
+    def add(self, audio: bytes, sequence: int, _type: AudioType, target: int):
         if _type != AudioType.OPUS:
             self._logger.warning(f"Received unsupported audio format {_type.name}")
             return
         self._lock.acquire()
-        try:
-            pcm = self._decoder.decode(audio, READ_BUFFER_SIZE)
-            if not self._start_sequence or sequence <= self._start_sequence:
-                self._start_time = time()
-                self._start_sequence = sequence
-                calculated_time = self._start_time
-            else:
-                calculated_time = self._start_time + (sequence - self._start_sequence) * SEQUENCE_DURATION
+        self._decoder.decode(audio, sequence, _type, target)
+        self._lock.release()
 
-            sound = SoundChunk(pcm, sequence, calculated_time, _type, target)
-            return sound
-        except Exception:
-            self._logger.error("Error while decoding audio", exc_info=True)
-        finally:
-            self._lock.release()
+    def _on_decoded(self, pcm: bytes, sequence: int, _type: AudioType, target: int):
+        self._logger.debug(f"LegacySoundQueue: decoded audio {len(pcm)}")
+        if not self._start_sequence or sequence <= self._start_sequence:
+            self._start_time = time()
+            self._start_sequence = sequence
+            calculated_time = self._start_time
+        else:
+            calculated_time = self._start_time + (sequence - self._start_sequence) * SEQUENCE_DURATION
+        sound = SoundChunk(pcm, sequence, calculated_time, _type, target)
+        self._callback(sound)
+

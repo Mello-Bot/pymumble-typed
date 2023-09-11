@@ -331,11 +331,7 @@ class Mumble:
     def _sound_received(self, packet: Audio):
         try:
             user = self.users[packet.sender_session]
-            sound = user.sound.add(packet.opus_data, packet.frame_number, AudioType.OPUS, packet.target)
-            self._logger.debug(f"Mumble: Decoded audio {sound}")
-            if sound is None:
-                return
-            self._callbacks.dispatch("on_sound_received", user, sound)
+            user.sound.add(packet.opus_data, packet.frame_number, AudioType.OPUS, packet.target)
         except KeyError:
             self._logger.error(f"Invalid user session {packet.sender_session}")
 

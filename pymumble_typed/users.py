@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from pymumble_typed.channels import Channel
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.protobuf.Mumble_pb2 import UserState, UserRemove
-
+    from pymumble_typed.sound.soundqueue import SoundChunk
 from struct import unpack
 from threading import Lock
 
@@ -17,7 +17,10 @@ from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, Remo
 
 class User:
     def __init__(self, mumble: Mumble, packet: UserState):
-        self.sound = LegacySoundQueue(mumble.logger)
+        def dispatch_sound(sound: SoundChunk):
+            mumble.callbacks.dispatch("on_sound_received", self, sound)
+
+        self.sound = LegacySoundQueue(dispatch_sound, mumble.logger)
         self._mumble: Mumble = mumble
         self.hash: str = packet.hash
         self.session: int = packet.session
