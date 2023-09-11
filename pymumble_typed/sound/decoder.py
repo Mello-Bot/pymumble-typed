@@ -11,14 +11,18 @@ from pymumble_typed.sound import SAMPLE_RATE, READ_BUFFER_SIZE, AudioType
 def decode(logger: Logger, input_queue: Queue,
            output_queue: Queue):
     decoder = OpusDecoder(SAMPLE_RATE, 2)
-    while True:
-        data, sequence, _type, target = input_queue.get(block=True, timeout=None)
-        # FIXME: READ_BUFFER_SIZE?
+    alive = True
+    while alive:
         try:
-            decoded = decoder.decode(data, READ_BUFFER_SIZE)
-            output_queue.put((decoded, sequence, _type, target))
-        except OpusError:
-            logger.error("Error while decoding audio")
+            data, sequence, _type, target = input_queue.get(block=True, timeout=None)
+            # FIXME: READ_BUFFER_SIZE?
+            try:
+                decoded = decoder.decode(data, READ_BUFFER_SIZE)
+                output_queue.put((decoded, sequence, _type, target))
+            except OpusError:
+                logger.error("Error while decoding audio")
+        except KeyboardInterrupt:
+            alive = False
 
 
 class Decoder(Thread):
