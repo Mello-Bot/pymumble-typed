@@ -54,14 +54,15 @@ class LegacySoundQueue(SoundQueue):
         self._start_sequence = None
         self._start_time = time()
         self._lock = Lock()
-        self.decoders = {
-            AudioType.OPUS: Decoder(SAMPLE_RATE, 2)
-        }
+        self._decoder = Decoder(SAMPLE_RATE, 2)
 
     def add(self, audio, sequence, _type: AudioType, target):
+        if _type != AudioType.OPUS:
+            self._logger.warning(f"Received unsupported audio format {_type.name}")
+            return
         self._lock.acquire()
         try:
-            pcm = self.decoders[_type].decode(audio, READ_BUFFER_SIZE)
+            pcm = self._decoder.decode(audio, READ_BUFFER_SIZE)
             if not self._start_sequence or sequence <= self._start_sequence:
                 self._start_time = time()
                 self._start_sequence = sequence
@@ -71,8 +72,6 @@ class LegacySoundQueue(SoundQueue):
 
             sound = SoundChunk(pcm, sequence, calculated_time, _type, target)
             return sound
-        except KeyError:
-            self._logger.error("Invalid decoder")
         except Exception:
             self._logger.error("Error while decoding audio", exc_info=True)
         finally:
