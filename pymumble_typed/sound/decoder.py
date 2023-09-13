@@ -1,6 +1,8 @@
 from logging import Logger
 from multiprocessing import Process, Queue
+from queue import Empty
 from threading import Thread
+from time import sleep
 from typing import Callable
 
 from opuslib import Decoder as OpusDecoder, OpusError
@@ -33,16 +35,20 @@ class Decoder(Thread):
         self._process = Process(target=decode, args=[logger, self._input_queue, self._output_queue])
         self.alive = True
         self._on_decoded = on_decoded
-        self.start()
         self._process.start()
+        self.start()
 
     def decode(self, data: bytes, sequence: int, _type: AudioType, target: int):
         self._input_queue.put((data, sequence, _type, target), block=True)
 
     def run(self):
         while self.alive:
-            pcm, sequence, _type, target = self._output_queue.get()
-            self._on_decoded(pcm, sequence, _type, target)
+            try:
+                pcm, sequence, _type, target = self._output_queue.get(False)
+                self._on_decoded(pcm, sequence, _type, target)
+            except Exception:
+                # FIXME: here we are busy-waiting since gevent doesn't play well with mp blocking Queue :-/
+                sleep(0.01)
 
     def __del__(self):
         self.alive = False
