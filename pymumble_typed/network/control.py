@@ -8,7 +8,7 @@ from struct import pack, unpack
 from threading import Thread, current_thread, Lock
 from time import sleep, time
 from typing import TYPE_CHECKING
-from ssl import SSLContext, PROTOCOL_TLS, PROTOCOL_TLSv1
+from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2
 
 from pymumble_typed import MessageType
 from pymumble_typed.commands import CommandQueue, Command
@@ -118,7 +118,7 @@ class ControlStack:
 
         try:
             self.logger.debug("ControlStack: Setting up TLS")
-            context = SSLContext(PROTOCOL_TLS)
+            context = SSLContext(PROTOCOL_TLSv1_2)
             context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
             self.socket = context.wrap_socket(socket_)
         except AttributeError:
