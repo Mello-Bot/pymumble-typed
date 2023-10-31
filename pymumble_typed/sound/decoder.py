@@ -1,55 +1,34 @@
 from logging import Logger
-from multiprocessing import Process, Queue
-from queue import Empty
-from threading import Thread
-from time import sleep
+from multiprocessing import cpu_count
+from multiprocessing.pool import ThreadPool
+
 from typing import Callable
 
-from opuslib import Decoder as OpusDecoder, OpusError
+from opuslib import Decoder as OpusDecoder
 
 from pymumble_typed.sound import SAMPLE_RATE, READ_BUFFER_SIZE, AudioType
 
+decoder: OpusDecoder = None
 
-def decode(logger: Logger, input_queue: Queue,
-           output_queue: Queue):
+
+def initializer():
+    global decoder
     decoder = OpusDecoder(SAMPLE_RATE, 2)
-    alive = True
-    while alive:
-        try:
-            data, sequence, _type, target = input_queue.get(block=True, timeout=None)
-            # FIXME: READ_BUFFER_SIZE?
-            try:
-                decoded = decoder.decode(data, READ_BUFFER_SIZE)
-                output_queue.put((decoded, sequence, _type, target))
-            except OpusError:
-                logger.error("Error while decoding audio")
-        except KeyboardInterrupt:
-            alive = False
 
 
-class Decoder(Thread):
-    def __init__(self, on_decoded: Callable[[bytes, int, AudioType, int], None], logger: Logger):
-        super().__init__(name="Decoder")
-        self._input_queue: Queue[(bytes, int, AudioType, int)] = Queue()
-        self._output_queue: Queue[(bytes, int, AudioType, int)] = Queue()
-        self._process = Process(target=decode, args=[logger, self._input_queue, self._output_queue])
-        self.alive = True
+def decode(data: bytes, sequence: int, _type: AudioType, target: int) -> (bytes, int, AudioType, int):
+    decoded = decoder.decode(data, READ_BUFFER_SIZE)
+    return decoded, sequence, _type, target
+
+
+class Decoder:
+    def __init__(self, on_decoded: Callable[[(bytes, int, AudioType, int)], None], logger: Logger):
+        self._pool = ThreadPool(processes=cpu_count() - 1, initializer=initializer)
         self._on_decoded = on_decoded
-        self._process.start()
-        self.start()
+        self._logger = logger
 
     def decode(self, data: bytes, sequence: int, _type: AudioType, target: int):
-        self._input_queue.put((data, sequence, _type, target), block=True)
+        self._pool.apply_async(decode, [data, sequence, _type, target], callback=self._on_decoded)
 
-    def run(self):
-        while self.alive:
-            try:
-                pcm, sequence, _type, target = self._output_queue.get(False)
-                self._on_decoded(pcm, sequence, _type, target)
-            except Exception:
-                # FIXME: here we are busy-waiting since gevent doesn't play well with mp blocking Queue :-/
-                sleep(0.01)
-
-    def __del__(self):
-        self.alive = False
-        self._process.kill()
+    def _error_cb(self, *_):
+        self._logger.error("Error while decoding audio")
