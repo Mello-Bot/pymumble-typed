@@ -52,19 +52,18 @@ class LegacySoundQueue(SoundQueue):
         super().__init__(logger)
         self._start_sequence = None
         self._start_time = time()
-        self._lock = Lock()
         self._decoder = Decoder(self._on_decoded, logger)
         self._callback = callback
+        self._logger = logger
 
     def add(self, audio: bytes, sequence: int, _type: AudioType, target: int):
         if _type != AudioType.OPUS:
             self._logger.warning(f"Received unsupported audio format {_type.name}")
             return
-        self._lock.acquire()
         self._decoder.decode(audio, sequence, _type, target)
-        self._lock.release()
 
-    def _on_decoded(self, pcm: bytes, sequence: int, _type: AudioType, target: int):
+    def _on_decoded(self, data: (bytes, int, AudioType, int)):
+        pcm, sequence, _type, target = data
         self._logger.debug(f"LegacySoundQueue: decoded audio {len(pcm)}")
         if not self._start_sequence or sequence <= self._start_sequence:
             self._start_time = time()
