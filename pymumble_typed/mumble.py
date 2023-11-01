@@ -63,7 +63,6 @@ class Mumble:
 
         self._bandwidth = BANDWIDTH
         self._server_max_bandwidth = 0
-        self._server_version = (0, 0, 0)
         self.users: Users = Users(self)
         self.channels: Channels = Channels(self)
         self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
@@ -123,26 +122,37 @@ class Mumble:
         self._control.set_control_message_dispatcher(self._dispatch_control_message)
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
-        self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
         self.voice = VoiceOutput(self._control, self._voice)
 
-    def _dispatch_voice_message(self, _type: int, message: bytes):
+    def _dispatch_voice_message(self, packet: bytes):
+        _type = packet[0]
+        message = packet[1:]
         try:
             self._logger.debug(f"Mumble: Received UDP packet type: {UdpMessageType(_type).name}")
         except ValueError:
             self._logger.debug(f"Mumble: Received UDP packet type: {_type}")
+        else:
+            if _type == UdpMessageType.Audio and self.sound_receive:
+                packet = Audio()
+                packet.ParseFromString(message)
+                self._sound_received(packet)
+            elif _type == UdpMessageType.Ping:
+                packet = UdpPingPacket()
+                packet.ParseFromString(message)
+                if packet.max_bandwidth_per_user:
+                    self._server_max_bandwidth = packet.max_bandwidth_per_user
+                    self._logger.debug(f"Mumble: updated server max bandwidth per client {self._server_max_bandwidth}")
+                self._voice.ping_response(packet)
 
-        if _type == UdpMessageType.Audio and self.sound_receive:
-            packet = Audio()
-            packet.ParseFromString(message)
-            self._sound_received(packet)
-        elif _type == UdpMessageType.Ping:
-            packet = UdpPingPacket()
-            packet.ParseFromString(message)
-            if packet.max_bandwidth_per_user:
-                self._server_max_bandwidth = packet.max_bandwidth_per_user
-                self._logger.debug(f"Mumble: updated server max bandwidth per client {self._server_max_bandwidth}")
-            self._voice.ping_response(packet)
+    def _dispatch_legacy_voice_message(self, packet: bytes):
+        pos = 0
+        (header,) = struct.unpack("!B", bytes([packet[pos]]))
+        _type = (header & 0b11100000) >> 5
+        target = header & 0b00011111
+        if _type == AudioType.PING:
+            self._voice.ping_legacy_response(packet[1:])
+        else:
+            self._legacy_sound_received(_type, target, packet[1:])
 
     def _dispatch_control_message(self, _type: int, message: bytes):
         try:
@@ -150,8 +160,8 @@ class Mumble:
         except ValueError:
             self._logger.debug(f"Mumble: Received TCP packet type: {_type}")
         if _type == MessageType.UDPTunnel and self.sound_receive:
-            if self._server_version < (1, 5, 0):
-                self._legacy_sound_received(message)
+            if self._control.server_version < (1, 5, 0):
+                self._dispatch_legacy_voice_message(message)
             else:
                 packet = UDPTunnel()
                 packet.ParseFromString(message)
@@ -161,7 +171,12 @@ class Mumble:
         elif _type == MessageType.Version:
             packet = Version()
             packet.ParseFromString(message)
+            self._control.set_version(packet)
             self._logger.debug(f"Mumble: Received version: {packet.version_v1}")
+            if self._control.server_version < (1,5,0):
+                self._voice.set_voice_message_dispatcher(self._dispatch_legacy_voice_message)
+            else:
+                self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
         elif _type == MessageType.Authenticate:
             packet = Authenticate()
             packet.ParseFromString(message)
@@ -279,17 +294,8 @@ class Mumble:
             self._bandwidth = min(bandwidth, self._server_max_bandwidth)
         self.voice.encoder.bandwidth = self._bandwidth
 
-    def _legacy_sound_received(self, packet: bytes):
+    def _legacy_sound_received(self, _type: AudioType, target: int, packet: bytes):
         pos = 0
-
-        (header,) = struct.unpack("!B", bytes([packet[pos]]))
-        _type = (header & 0b11100000) >> 5
-        target = header & 0b00011111
-        pos += 1
-
-        if _type == AudioType.PING:
-            return
-
         session = VarInt()
         pos += session.decode(packet[pos: pos + 10])
 

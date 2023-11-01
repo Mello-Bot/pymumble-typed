@@ -64,6 +64,7 @@ class ControlStack:
         self._ready = Lock()
         self._ready.acquire(True)
         self._legacy_buffer_lock = Lock()
+        self._server_version = (0, 0, 0)
 
     def reinit(self) -> ControlStack:
         self.disconnect()
@@ -313,3 +314,15 @@ class ControlStack:
 
     def __del__(self):
         self.disconnect()
+
+    def set_version(self, packet: Version):
+        if packet.version_v2:
+            version = packet.version_v2
+            self._server_version = (version >> 48 & 65535), (version >> 32 & 65535), (version >> 16 & 65535)
+        else:
+            version = packet.version_v1
+            self._server_version = ((version >> 16 & 255), (version >> 8 & 255), (version & 255))
+
+    @property
+    def server_version(self):
+        return self._server_version

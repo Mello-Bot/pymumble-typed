@@ -9,6 +9,7 @@ from pymumble_typed.network.control import ControlStack
 
 from pymumble_typed.network.udp_data import PingData, UDPData
 from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
+from pymumble_typed.tools import VarInt
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -34,7 +35,7 @@ class VoiceStack:
         self._crypt_lock = Lock()
         self._last_lost = 0
         self._protocol_switch_listeners: list[Callable[[bool], None]] = []
-        self._dispatcher: Callable[[UdpMessageType, bytes], None] = lambda _, __: None
+        self._dispatcher: Callable[[bytes], None] = lambda _: None
         self.last_ping: PingData = PingData()
         self.ping_sent = 0
         self.ping_recv = 0
@@ -82,8 +83,8 @@ class VoiceStack:
             return
         self._crypt_lock.acquire(True)
         decrypted = self.ocb.decrypt(response)
-        self._dispatcher(decrypted[0], decrypted[1:])
         self._crypt_lock.release()
+        self._dispatcher(decrypted)
         self._conn_check_thread.start()
 
     def enable_udp(self):
@@ -107,8 +108,9 @@ class VoiceStack:
     def send_packet(self, data: UDPData, enforce=False):
         if self.active or enforce:
             self.logger.debug(f"VoiceStack: sending {data.type.name}")
+            packet = data.serialized_udp_packet if self.control.server_version >= (1, 5, 0) else data.legacy_udp_packet
             self._crypt_lock.acquire(True)
-            encrypted = self.ocb.encrypt(data.serialized_udp_packet)
+            encrypted = self.ocb.encrypt(packet)
             self._crypt_lock.release()
             try:
                 self.socket.sendto(encrypted, self.addr)
@@ -124,7 +126,7 @@ class VoiceStack:
             try:
                 response = self.socket.recv(2048)
                 decrypted = self.ocb.decrypt(response)
-                self._dispatcher(decrypted[0], decrypted[1:])
+                self._dispatcher(decrypted)
             except BlockingIOError:
                 self.logger.error("VoiceStack: BlockingIOError, packet may will be lost in the next seconds")
                 sleep(1)
@@ -132,10 +134,18 @@ class VoiceStack:
             f"VoiceStack: Exiting ListenLoop. Active: {self.active} Exit: {self.exit} Connected: {self.control.is_connected()}")
 
     def ping_response(self, ping: Ping):
-        ping_time = None
         if ping.max_bandwidth_per_user:
             self._extended_info = True
-        if self.last_ping.time != ping.timestamp:
+        self._handle_ping(ping.timestamp)
+
+    def ping_legacy_response(self, ping: bytes):
+        timestamp = VarInt()
+        timestamp.decode(ping)
+        self._handle_ping(timestamp.value)
+
+    def _handle_ping(self, timestamp: int):
+        ping_time = None
+        if self.last_ping.time != timestamp:
             self.logger.debug("VoiceStack: handling lost UDP ping")
             self.ping_lost += 1
             self.ping_recv += 1
@@ -144,12 +154,12 @@ class VoiceStack:
             self.logger.debug("VoiceStack: handling UDP ping, resuming inactive connection")
             self.ping_recv = self.ping_sent
             self.enable_udp()
-            ping_time = time_ns() - ping.timestamp
+            ping_time = time_ns() - timestamp
         else:
             self._last_good_ping = time()
             self.logger.debug("VoiceStack: handling UDP ping")
             self.ping_recv += 1
-            ping_time = time_ns() - ping.timestamp
+            ping_time = time_ns() - timestamp
         if ping_time:
             try:
                 ping_time = ping_time / 1000000
