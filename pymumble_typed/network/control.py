@@ -129,9 +129,10 @@ class ControlStack:
 
         try:
             self.socket.connect((self.host, self.port))
-        except socket_error:
+        except socket_error as se:
             self.status = Status.FAILED
             self.logger.error("ControlStack: Error while upgrading to encrypted connection", exc_info=True)
+            raise se
 
         try:
             self.logger.debug("ControlStack: Sending version")
