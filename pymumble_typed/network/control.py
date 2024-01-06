@@ -9,6 +9,7 @@ from threading import Thread, current_thread, Lock
 from time import sleep, time
 from typing import TYPE_CHECKING
 from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2
+from queue import Queue, Empty
 
 from pymumble_typed import MessageType
 from pymumble_typed.commands import CommandQueue, Command
@@ -59,7 +60,7 @@ class ControlStack:
         self._dispatch_control_message = lambda _, __: None
         self.thread = Thread(target=self.loop, name="ControlStack:Loop")
 
-        self._legacy_buffer: list[AudioData] = []
+        self._legacy_buffer: Queue[AudioData] = Queue(maxsize=64)
 
         self._ready = Lock()
         self._ready.acquire(True)
@@ -222,14 +223,11 @@ class ControlStack:
                     for _ in range(0, min(len(self.command_queue), self.command_limit)):
                         self._treat_command(self.command_queue.pop())
 
-                if self._legacy_buffer_lock.acquire(False):
-                    try:
-                        audio = self._legacy_buffer.pop(0)
+                try:
+                    audio = self._legacy_buffer.get(block=False)
                         self.send_audio_legacy(audio)
-                        # self.send_message(MessageType.UDPTunnel, audio.tcp_packet)
-                    except IndexError:
-                        pass
-                    self._legacy_buffer_lock.release()
+                except Empty:
+                    pass
 
             (rlist, wlist, xlist) = select([self.socket], [], [self.socket], self.loop_rate)
             if self.socket in rlist:
@@ -293,11 +291,7 @@ class ControlStack:
         self.send_message(MessageType.Authenticate, packet)
 
     def enqueue_audio(self, data: AudioData):
-        while len(self._legacy_buffer) > 64:
-            sleep(0.01)  # FIXME: buffer is growing too much, busy waiting
-        self._legacy_buffer_lock.acquire(True)
-        self._legacy_buffer.append(data)
-        self._legacy_buffer_lock.release()
+        self._legacy_buffer.put(data, block=True)
 
     def ready(self):
         self.logger.debug("ControlStack: releasing ready lock")
