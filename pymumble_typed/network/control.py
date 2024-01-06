@@ -64,8 +64,8 @@ class ControlStack:
 
         self._ready = Lock()
         self._ready.acquire(True)
-        self._legacy_buffer_lock = Lock()
         self._server_version = (0, 0, 0)
+        self._voice_dispatcher: Callable[[AudioData], None] = self.send_audio_legacy
 
     def reinit(self) -> ControlStack:
         self.disconnect()
@@ -204,10 +204,14 @@ class ControlStack:
         tcp_packet = audio.legacy_tcp_packet
         while len(tcp_packet) > 0:
             sent = self.socket.send(tcp_packet)
-            self.logger.debug(f"Mumble: audio sent {sent}")
+            self.logger.debug(f"ControlStack: audio sent {sent}")
             if sent < 0:
-                raise socket_error("Server socket error while sending audio")
+                raise socket_error("ControlStack: Server socket error while sending audio")
             tcp_packet = tcp_packet[sent:]
+
+    def send_audio(self, audio: AudioData):
+        self.logger.debug(f"ControlStack: sending audio protobuf")
+        self.send_message(MessageType.UDPTunnel, audio.tcp_packet)
 
     def _listen(self):
         exit_ = False
@@ -225,7 +229,7 @@ class ControlStack:
 
                 try:
                     audio = self._legacy_buffer.get(block=False)
-                        self.send_audio_legacy(audio)
+                    self._voice_dispatcher(audio)
                 except Empty:
                     pass
 
@@ -316,6 +320,10 @@ class ControlStack:
         else:
             version = packet.version_v1
             self._server_version = ((version >> 16 & 255), (version >> 8 & 255), (version & 255))
+        if self._server_version >= (1, 5, 0) and PROTOCOL_VERSION >= (1, 5, 0):
+            self._voice_dispatcher = self.send_audio
+        else:
+            self._voice_dispatcher = self.send_audio_legacy
 
     @property
     def server_version(self):

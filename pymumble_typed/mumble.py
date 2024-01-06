@@ -173,7 +173,7 @@ class Mumble:
             packet.ParseFromString(message)
             self._control.set_version(packet)
             self._logger.debug(f"Mumble: Received version: {packet.version_v1}")
-            if self._control.server_version < (1,5,0):
+            if self._control.server_version < (1, 5, 0):
                 self._voice.set_voice_message_dispatcher(self._dispatch_legacy_voice_message)
             else:
                 self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
