@@ -2,10 +2,10 @@
 # 2nd Source: https://github.com/ianling/mumpy/blob/dev/mumpy/mumblecrypto.py
 from math import ceil
 from struct import pack, unpack
+from time import time
 
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
-from time import time
 
 AES_BLOCK_SIZE = 128 // 8
 AES_KEY_SIZE_BITS = 128

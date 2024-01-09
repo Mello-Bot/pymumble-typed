@@ -1,11 +1,22 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pymumble_typed.network.control import ControlStack, Status
+
+from threading import Timer
 from time import time
+
+from pymumble_typed import MessageType
 from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket
 
 
-class Ping:
+class Ping(Timer):
     DELAY = 10
 
-    def __init__(self):
+    def __init__(self, control: ControlStack):
+        super().__init__(Ping.DELAY, self.send)
         self.last_receive = 0.
         self.time_send = 0.
         self.number = 1
@@ -18,25 +29,30 @@ class Ping:
         self.udp_late: int = 0
         self.udp_lost: int = 0
         self.last = 0
-        self.packet = PingPacket()
+        self._control = control
+
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
 
     def send(self):
-        if self.last + Ping.DELAY < time():
-            self.packet = PingPacket()
-            self.packet.timestamp = int(time())
-            self.packet.tcp_ping_avg = self.average
-            self.packet.tcp_ping_var = self.variance
-            self.packet.tcp_packets = self.number
-            self.packet.udp_packets = self.udp_packets
-            self.packet.udp_ping_avg = self.udp_ping_average
-            self.packet.udp_ping_var = self.udp_ping_variance
-            self.packet.good = self.udp_good
-            self.packet.late = self.udp_late
-            self.packet.lost = self.udp_lost
-            self.time_send = int(time() * 1000)
-            self.last = time()
-            return True
-        return False
+        packet = PingPacket()
+        packet.timestamp = int(time())
+        packet.tcp_ping_avg = self.average
+        packet.tcp_ping_var = self.variance
+        packet.tcp_packets = self.number
+        packet.udp_packets = self.udp_packets
+        packet.udp_ping_avg = self.udp_ping_average
+        packet.udp_ping_var = self.udp_ping_variance
+        packet.good = self.udp_good
+        packet.late = self.udp_late
+        packet.lost = self.udp_lost
+        self.time_send = int(time() * 1000)
+        self.last = time()
+        self._control.send_message(MessageType.PingPacket, packet)
+        if self.last_receive != 0 and time() > self.last_receive + 60:
+            self._control.status = Status.NOT_CONNECTED
+        return True
 
     def receive(self, _: PingPacket):
         self.last_receive = int(time() * 1000)
