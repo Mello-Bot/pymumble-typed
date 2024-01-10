@@ -31,17 +31,16 @@ class VoiceOutput:
         if len(pcm) % 2 != 0:
             raise ValueError("pcm data must be 16 bits")
         samples = self._encoder.samples
-        if len(self._remaining_sample) < samples:
-            initial_offset = samples - len(self._remaining_sample)
-            self._remaining_sample += pcm[initial_offset:]
-            self._buffer.put(self._remaining_sample)
-            self._remaining_sample = bytes()
-        else:
-            initial_offset = 0
-        remaining = len(pcm) % samples
-        self._remaining_sample = pcm[-remaining:]
-        for i in range(initial_offset, len(pcm) - remaining, samples):
+
+        if time() - self._sequence_last_time <= self._encoder.audio_per_packet:
+            pcm = self._remaining_sample + pcm
+        self._remaining_sample = bytes()
+
+        offset = len(pcm) // samples
+        i = 0
+        for i in range(0, offset * samples, samples):
             self._buffer.put(pcm[i:i + samples])
+        self._remaining_sample = pcm[i:]
         self.send_audio()
 
     def _update_sequence(self):
