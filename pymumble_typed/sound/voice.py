@@ -68,13 +68,11 @@ class VoiceOutput:
         self._update_sequence()
         audio = AudioData()
         audio_encoded = 0
-        pcm = self._buffer.get()
-        while pcm and audio_encoded < audio_per_packet:
+        while not self._buffer.empty() and audio_encoded < audio_per_packet:
+            pcm = self._buffer.get(block=False)
             encoded = self._encoder.encode(pcm)
             audio.add_chunk(encoded)
             audio_encoded += self._encoder.encoder_framesize
-            if audio_encoded < audio_per_packet:
-                pcm = self._buffer.get()
         audio.target = self.target
         audio.sequence = self._sequence
         audio.positional = self.positional
