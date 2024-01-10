@@ -154,11 +154,11 @@ class ControlStack:
         while len(packet) > 0:
             try:
                 sent = self.socket.send(packet)
+                if sent < 0:
+                    raise socket_error("ControlStack: Server socket error")
+                packet = packet[sent:]
             except SSLZeroReturnError:
                 self.status = Status.FAILED
-            if sent < 0:
-                raise socket_error("ControlStack: Server socket error")
-            packet = packet[sent:]
 
     def _read_control_messages(self):
         try:
@@ -169,7 +169,6 @@ class ControlStack:
         except socket_error:
             self.logger.error("ControlStack: Error while reading control messages", exc_info=True)
             return
-
 
         while len(self.receive_buffer) >= 6:
             header = self.receive_buffer[0:6]
