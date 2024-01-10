@@ -1,5 +1,4 @@
 from queue import Queue
-from threading import Thread
 from time import time, sleep
 
 from pymumble_typed.network.control import ControlStack
@@ -23,8 +22,6 @@ class VoiceOutput:
         self._sequence_start_time = 0
         self._sequence_last_time = 0
         self._sequence = 0
-
-        self._thread = Thread(target=self.send_audio, name="VoiceOutput:SendAudio")
 
     # Legacy code support
     def add_sound(self, pcm: bytes):
@@ -66,30 +63,23 @@ class VoiceOutput:
     def clear_buffer(self):
         self._buffer = Queue()
 
-    def get_buffer_size(self):
-        sample_rate = self._encoder.sample_rate
-        channels = self._encoder.channels
-        samples = self._encoder.samples
-
-        return self._buffer.qsize() * samples / 2. / sample_rate / channels
-
     def send_audio(self):
         audio_per_packet = self._encoder.audio_per_packet
-        while not self._buffer.empty():
-            while not self._buffer.empty() and self._sequence_last_time + audio_per_packet <= time():
-                self._update_sequence()
-                audio = AudioData()
-                audio_encoded = 0
-                while not self._buffer.empty() and audio_encoded < audio_per_packet:
-                    pcm = self._buffer.get(block=False)
-                    encoded = self._encoder.encode(pcm)
-                    audio.add_chunk(encoded)
-                    audio_encoded += self._encoder.encoder_framesize
-                audio.target = self.target
-                audio.sequence = self._sequence
-                audio.positional = self.positional
-                self._voice.send_packet(audio)
-            sleep(0.01)
+        self._update_sequence()
+        audio = AudioData()
+        audio_encoded = 0
+        pcm = self._buffer.get()
+        while pcm and audio_encoded < audio_per_packet:
+            encoded = self._encoder.encode(pcm)
+            audio.add_chunk(encoded)
+            audio_encoded += self._encoder.encoder_framesize
+            if audio_encoded < audio_per_packet:
+                pcm = self._buffer.get()
+        audio.target = self.target
+        audio.sequence = self._sequence
+        audio.positional = self.positional
+        self._voice.send_packet(audio)
+        sleep(audio_per_packet - (time() - self._sequence_last_time))
 
     @property
     def encoder(self):
