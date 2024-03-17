@@ -1,32 +1,29 @@
 from __future__ import annotations
 
+import struct
+from enum import IntEnum
 from logging import Logger, ERROR, DEBUG, StreamHandler
+from threading import current_thread
+
 from typing_extensions import TypedDict
 
 from pymumble_typed import MessageType, UdpMessageType
+from pymumble_typed.callbacks import Callbacks
+from pymumble_typed.channels import Channels
+from pymumble_typed.commands import Command
+from pymumble_typed.messages import Message as MessageContainer
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
-
-import struct
-
 from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping as UdpPingPacket
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
     RequestBlob, ServerConfig, UDPTunnel
-
-from pymumble_typed.callbacks import Callbacks
-from pymumble_typed.channels import Channels
-from pymumble_typed.commands import Command
-from pymumble_typed.messages import Message as MessageContainer
+from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
 from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
-
-from enum import IntEnum
-from threading import current_thread
-from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
 
 
 class ClientType(IntEnum):
@@ -200,11 +197,6 @@ class Mumble:
             if self._control.status == Status.AUTHENTICATING:
                 self._control.status = Status.CONNECTED
                 self._ready = True
-
-                # FIXME: experimental, using number of users as command limit per loop cycle
-                #  since this is set on client startup minimum is 5 to avoid excessively low limit
-                if len(self.users) > self._control.command_limit:
-                    self._control.command_limit = len(self.users)
                 self._control.ready()
                 self._callbacks.ready()
                 self._callbacks.dispatch("on_connect")
@@ -360,12 +352,10 @@ class Mumble:
         self._control.is_ready()
 
     def execute_command(self, cmd: Command, blocking: bool = True):
-        self.is_ready()
-        lock = self._control.command_queue.push(cmd)
-        if blocking and self._control.thread is not current_thread():
-            lock.acquire()
-            lock.release()
-        return lock
+        if blocking:
+            self.is_ready()
+        self._control.send_message(cmd.type, cmd.packet)
+        return None
 
     def get_max_message_length(self) -> int:
         return self.settings["server_max_message_length"]

@@ -67,7 +67,7 @@ class User:
             actions["self_deaf"] = self.self_deaf
             self.self_deaf = packet.self_deaf
         if packet.HasField("suppress") and self.suppressed != packet.suppress:
-            actions["suppress"] = self.suppress
+            actions["suppress"] = self.suppressed
             self.suppressed = packet.suppress
 
         if packet.HasField("comment_hash"):

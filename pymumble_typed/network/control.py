@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from select import select
-
 from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
+from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLZeroReturnError
 from struct import pack, unpack
 from threading import Thread, current_thread, Lock
-from time import sleep, time
+from time import sleep
 from typing import TYPE_CHECKING
-from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2
-from queue import Queue, Empty
 
 from pymumble_typed import MessageType
-from pymumble_typed.commands import CommandQueue, Command
+from pymumble_typed.commands import Command
 from pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
-from pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, LOOP_RATE, READ_BUFFER_SIZE
+from pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, READ_BUFFER_SIZE
 from pymumble_typed.network.ping import Ping
 from pymumble_typed.network.udp_data import AudioData
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate
@@ -51,21 +48,17 @@ class ControlStack:
         self.status = Status.NOT_CONNECTED
         self._disconnect = False
         self.reconnect = False
-        self.command_limit: int = 5
-        self.command_queue: CommandQueue = CommandQueue()
-        self.loop_rate = LOOP_RATE
         self._on_disconnect: Callable[[], None] = lambda: None
-        self.ping: Ping = Ping()
+
         self.receive_buffer: bytes = bytes()
         self._dispatch_control_message = lambda _, __: None
         self.thread = Thread(target=self.loop, name="ControlStack:Loop")
-
-        self._legacy_buffer: Queue[AudioData] = Queue(maxsize=64)
 
         self._ready = Lock()
         self._ready.acquire(True)
         self._server_version = (0, 0, 0)
         self._voice_dispatcher: Callable[[AudioData], None] = self.send_audio_legacy
+        self.ping: Ping = Ping(self)
 
     def reinit(self) -> ControlStack:
         self.disconnect()
@@ -158,17 +151,21 @@ class ControlStack:
     def send_message(self, _type: MessageType, message: Message):
         self.logger.debug(f"ControlStack: sending TCP {_type.name}")
         packet = pack("!HL", _type.value, message.ByteSize()) + message.SerializeToString()
-
         while len(packet) > 0:
-            sent = self.socket.send(packet)
-            if sent < 0:
-                raise socket_error("ControlStack: Server socket error")
-            packet = packet[sent:]
+            try:
+                sent = self.socket.send(packet)
+                if sent < 0:
+                    raise socket_error("ControlStack: Server socket error")
+                packet = packet[sent:]
+            except SSLZeroReturnError:
+                self.status = Status.FAILED
 
     def _read_control_messages(self):
         try:
             buffer: bytes = self.socket.recv(READ_BUFFER_SIZE)
             self.receive_buffer += buffer
+        except TimeoutError:
+            return
         except socket_error:
             self.logger.error("ControlStack: Error while reading control messages", exc_info=True)
             return
@@ -188,17 +185,10 @@ class ControlStack:
             self.receive_buffer = self.receive_buffer[size + 6:]
             self._dispatch_control_message(_type, message)
 
-    def _ping(self):
-        if self.ping.send():
-            self.send_message(MessageType.PingPacket, self.ping.packet)
-        if self.ping.last_receive != 0 and time() > self.ping.last_receive + 60:
-            self.status = Status.NOT_CONNECTED
-
-    def _treat_command(self, cmd: Command):
+    def send_command(self, cmd: Command):
         if cmd.packet:
             self.send_message(cmd.type, cmd.packet)
             cmd.response = True
-            self.command_queue.answer(cmd)
 
     def send_audio_legacy(self, audio: AudioData):
         tcp_packet = audio.legacy_tcp_packet
@@ -219,27 +209,7 @@ class ControlStack:
         while self.status != Status.NOT_CONNECTED and self.status != Status.FAILED and not self._disconnect:
             if not parent_thread.is_alive():
                 self.disconnect()
-            self._ping()
-            if self.status == Status.CONNECTED:
-                if self.command_queue.has_next():
-                    # FIXME: experimental, limit number of command per cycle to avoid too long processing
-                    #   this may be useful on busy server or if the client is sending a lot of command
-                    for _ in range(0, min(len(self.command_queue), self.command_limit)):
-                        self._treat_command(self.command_queue.pop())
-
-                try:
-                    audio = self._legacy_buffer.get(block=False)
-                    self._voice_dispatcher(audio)
-                except Empty:
-                    pass
-
-            (rlist, wlist, xlist) = select([self.socket], [], [self.socket], self.loop_rate)
-            if self.socket in rlist:
-                self._read_control_messages()
-            elif self.socket in xlist:
-                self.logger.debug("ControlStack: Handling disconnection")
-                self.socket.close()
-                self.status = Status.NOT_CONNECTED
+            self._read_control_messages()
         self._ready.release()
         self.logger.debug(f"ControlStack: Exiting. Status: {self.status} Exit: {exit_}")
 
@@ -248,6 +218,7 @@ class ControlStack:
         self.logger.debug(self.status)
         while (
                 self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
+            self.ping = Ping(self)
             if not self.is_connected():
                 self.logger.debug("ControlStack: Reconnecting...")
                 self.connect()
@@ -258,7 +229,9 @@ class ControlStack:
             if self.is_connected():
                 try:
                     self.logger.debug("ControlStack: Listening...")
+                    self.ping.start()
                     self._listen()
+                    self.ping.cancel()
                     self._ready.acquire(True)
                 except socket_error as e:
                     self.logger.error(
@@ -295,7 +268,7 @@ class ControlStack:
         self.send_message(MessageType.Authenticate, packet)
 
     def enqueue_audio(self, data: AudioData):
-        self._legacy_buffer.put(data, block=True)
+        self._voice_dispatcher(data)
 
     def ready(self):
         self.logger.debug("ControlStack: releasing ready lock")

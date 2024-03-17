@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from multiprocessing.pool import ThreadPool
 from typing import TYPE_CHECKING, Callable
+
 from typing_extensions import TypedDict, Literal
 
 if TYPE_CHECKING:

@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING, Callable
 if TYPE_CHECKING:
     from logging import Logger
 
-from threading import Lock
-
 from pymumble_typed.sound import SAMPLE_RATE, AudioType, SEQUENCE_DURATION
 from pymumble_typed.sound.decoder import Decoder
 

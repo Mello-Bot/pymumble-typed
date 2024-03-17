@@ -1,8 +1,9 @@
 from threading import Lock
 
+from opuslib import Encoder as OpusEncoder, OpusError
+
 from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.sound import AUDIO_PER_PACKET, SAMPLE_RATE, CodecProfile, BANDWIDTH, CHANNELS
-from opuslib import Encoder as OpusEncoder, OpusError
 
 
 class Encoder:
@@ -42,12 +43,12 @@ class Encoder:
     def encode(self, pcm: bytes) -> bytes:
         if len(pcm) < self._samples:
             pcm += b'\x00' * (self._samples - len(pcm))
+        self._encoder_ready.acquire(blocking=True)
         try:
-            self._encoder_ready.acquire(blocking=True)
             encoded = self._encoder.encode(pcm, len(pcm) // self._sample_size)
-            self._encoder_ready.release()
         except OpusError:
             encoded = b''
+        self._encoder_ready.release()
         return encoded
 
     @property

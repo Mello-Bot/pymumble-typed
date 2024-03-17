@@ -7,8 +7,6 @@ if TYPE_CHECKING:
     from pymumble_typed.mumble import Mumble
 
 from pymumble_typed import MessageType
-from collections import deque
-from threading import Lock
 
 from pymumble_typed.protobuf.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, \
     ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL
@@ -20,7 +18,6 @@ class Command:
     def __init__(self):
         self.id = 0
         self.type: MessageType = MessageType.PingPacket
-        self.lock = Lock()
         self.response = False
         self.packet: Message | None = None
 
@@ -257,37 +254,3 @@ class UpdateACL(Command):
             if not chan_acl.inherited:
                 self.packet.acls.append(chan_acl)
         self.packet.query = False
-
-
-class CommandQueue:
-    def __init__(self):
-        self.id = 0
-        self.queue = deque()
-        self.lock = Lock()
-
-    def push(self, cmd: Command):
-        self.lock.acquire()
-        self.id += 1
-        cmd.cmd_id = self.id
-        self.queue.appendleft(cmd)
-        cmd.lock.acquire()
-        self.lock.release()
-        return cmd.lock
-
-    def has_next(self):
-        return len(self.queue) > 0
-
-    def pop(self):
-        self.lock.acquire()
-        try:
-            return self.queue.pop()
-        except IndexError:
-            return None
-        finally:
-            self.lock.release()
-
-    def answer(self, cmd: Command):
-        cmd.lock.release()
-
-    def __len__(self):
-        return len(self.queue)
