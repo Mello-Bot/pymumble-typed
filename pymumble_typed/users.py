@@ -17,10 +17,7 @@ from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, Remo
 
 class User:
     def __init__(self, mumble: Mumble, packet: UserState):
-        def dispatch_sound(sound: SoundChunk):
-            mumble.callbacks.dispatch("on_sound_received", self, sound)
-
-        self.sound = LegacySoundQueue(dispatch_sound, mumble.logger)
+        self.sound = LegacySoundQueue(lambda sound: mumble.callbacks.dispatch("on_sound_received", self, sound), mumble.logger)
         self._mumble: Mumble = mumble
         self.hash: str = packet.hash
         self.session: int = packet.session
