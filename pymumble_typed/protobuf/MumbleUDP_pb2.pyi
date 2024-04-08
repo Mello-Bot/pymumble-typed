@@ -6,21 +6,17 @@ Use of this source code is governed by a BSD-style license
 that can be found in the LICENSE file at the root of the
 Mumble source tree or at <https://www.mumble.info/LICENSE>.
 """
+
 import builtins
 import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
-
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class Audio(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -53,11 +49,6 @@ class Audio(google.protobuf.message.Message):
     """The number of the first contained audio frame (indicating the position of that frame in the overall audio stream)"""
     opus_data: builtins.bytes
     """The actual voice data payload in the Opus format."""
-    @property
-    def positional_data(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
-        """Optional positional data indicating the speaker's position in a virtual world (in meters). This "list" is really
-        expected to be an array of size 3 containing the X, Y and Z coordinates of the position (in that order).
-        """
     volume_adjustment: builtins.float
     """A volume adjustment determined by the server for this audio packet. It is up to the client to apply this adjustment to
     the resulting audio (or not). Note: A value of 0 means that this field is unset.
@@ -72,6 +63,12 @@ class Audio(google.protobuf.message.Message):
 
     A flag indicating whether this audio packet represents the end of transmission for the current audio stream
     """
+    @property
+    def positional_data(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
+        """Optional positional data indicating the speaker's position in a virtual world (in meters). This "list" is really
+        expected to be an array of size 3 containing the X, Y and Z coordinates of the position (in that order).
+        """
+
     def __init__(
         self,
         *,
@@ -84,13 +81,13 @@ class Audio(google.protobuf.message.Message):
         volume_adjustment: builtins.float = ...,
         is_terminator: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["Header", b"Header", "context", b"context", "target", b"target"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["Header", b"Header", "context", b"context", "frame_number", b"frame_number", "is_terminator", b"is_terminator", "opus_data", b"opus_data", "positional_data", b"positional_data", "sender_session", b"sender_session", "target", b"target", "volume_adjustment", b"volume_adjustment"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["Header", b"Header"]) -> typing_extensions.Literal["target", "context"] | None: ...
+    def HasField(self, field_name: typing.Literal["Header", b"Header", "context", b"context", "target", b"target"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["Header", b"Header", "context", b"context", "frame_number", b"frame_number", "is_terminator", b"is_terminator", "opus_data", b"opus_data", "positional_data", b"positional_data", "sender_session", b"sender_session", "target", b"target", "volume_adjustment", b"volume_adjustment"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["Header", b"Header"]) -> typing.Literal["target", "context"] | None: ...
 
 global___Audio = Audio
 
-@typing_extensions.final
+@typing.final
 class Ping(google.protobuf.message.Message):
     """*
     Ping message for checking UDP connectivity (and roundtrip ping) and potentially obtaining further server
@@ -135,6 +132,6 @@ class Ping(google.protobuf.message.Message):
         max_user_count: builtins.int = ...,
         max_bandwidth_per_user: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["max_bandwidth_per_user", b"max_bandwidth_per_user", "max_user_count", b"max_user_count", "request_extended_information", b"request_extended_information", "server_version_v2", b"server_version_v2", "timestamp", b"timestamp", "user_count", b"user_count"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["max_bandwidth_per_user", b"max_bandwidth_per_user", "max_user_count", b"max_user_count", "request_extended_information", b"request_extended_information", "server_version_v2", b"server_version_v2", "timestamp", b"timestamp", "user_count", b"user_count"]) -> None: ...
 
 global___Ping = Ping
