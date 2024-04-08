@@ -6,6 +6,7 @@ Use of this source code is governed by a BSD-style license
 that can be found in the LICENSE file at the root of the
 Mumble source tree or at <https://www.mumble.info/LICENSE>.
 """
+
 import builtins
 import collections.abc
 import google.protobuf.descriptor
@@ -22,7 +23,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class Version(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -52,12 +53,12 @@ class Version(google.protobuf.message.Message):
         os: builtins.str | None = ...,
         os_version: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["os", b"os", "os_version", b"os_version", "release", b"release", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["os", b"os", "os_version", b"os_version", "release", b"release", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["os", b"os", "os_version", b"os_version", "release", b"release", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["os", b"os", "os_version", b"os_version", "release", b"release", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> None: ...
 
 global___Version = Version
 
-@typing_extensions.final
+@typing.final
 class UDPTunnel(google.protobuf.message.Message):
     """Not used. Not even for tunneling UDP through TCP."""
 
@@ -71,12 +72,12 @@ class UDPTunnel(google.protobuf.message.Message):
         *,
         packet: builtins.bytes | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["packet", b"packet"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["packet", b"packet"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["packet", b"packet"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["packet", b"packet"]) -> None: ...
 
 global___UDPTunnel = UDPTunnel
 
-@typing_extensions.final
+@typing.final
 class Authenticate(google.protobuf.message.Message):
     """Used by the client to send the authentication credentials to the server."""
 
@@ -92,15 +93,17 @@ class Authenticate(google.protobuf.message.Message):
     """UTF-8 encoded username."""
     password: builtins.str
     """Server or user password."""
-    @property
-    def tokens(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """Additional access tokens for server ACL groups."""
-    @property
-    def celt_versions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """A list of CELT bitstream version constants supported by the client."""
     opus: builtins.bool
     client_type: builtins.int
     """0 = REGULAR, 1 = BOT"""
+    @property
+    def tokens(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Additional access tokens for server ACL groups."""
+
+    @property
+    def celt_versions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """A list of CELT bitstream version constants supported by the client."""
+
     def __init__(
         self,
         *,
@@ -111,12 +114,12 @@ class Authenticate(google.protobuf.message.Message):
         opus: builtins.bool | None = ...,
         client_type: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["client_type", b"client_type", "opus", b"opus", "password", b"password", "username", b"username"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["celt_versions", b"celt_versions", "client_type", b"client_type", "opus", b"opus", "password", b"password", "tokens", b"tokens", "username", b"username"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["client_type", b"client_type", "opus", b"opus", "password", b"password", "username", b"username"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["celt_versions", b"celt_versions", "client_type", b"client_type", "opus", b"opus", "password", b"password", "tokens", b"tokens", "username", b"username"]) -> None: ...
 
 global___Authenticate = Authenticate
 
-@typing_extensions.final
+@typing.final
 class Ping(google.protobuf.message.Message):
     """Sent by the client to notify the server that the client is still alive.
     Server must reply to the packet with the same timestamp and its own
@@ -173,12 +176,12 @@ class Ping(google.protobuf.message.Message):
         tcp_ping_avg: builtins.float | None = ...,
         tcp_ping_var: builtins.float | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "timestamp", b"timestamp", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "timestamp", b"timestamp", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "timestamp", b"timestamp", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "timestamp", b"timestamp", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var"]) -> None: ...
 
 global___Ping = Ping
 
-@typing_extensions.final
+@typing.final
 class Reject(google.protobuf.message.Message):
     """Sent by the server when it rejects the user connection."""
 
@@ -188,7 +191,7 @@ class Reject(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _RejectTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Reject._RejectType.ValueType], builtins.type):  # noqa: F821
+    class _RejectTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Reject._RejectType.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         WrongVersion: Reject._RejectType.ValueType  # 1
         """The client attempted to connect with an incompatible version."""
@@ -243,12 +246,12 @@ class Reject(google.protobuf.message.Message):
         type: global___Reject.RejectType.ValueType | None = ...,
         reason: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["reason", b"reason", "type", b"type"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["reason", b"reason", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["reason", b"reason", "type", b"type"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["reason", b"reason", "type", b"type"]) -> None: ...
 
 global___Reject = Reject
 
-@typing_extensions.final
+@typing.final
 class ServerSync(google.protobuf.message.Message):
     """ServerSync message is sent by the server when it has authenticated the user
     and finished synchronizing the server state.
@@ -280,12 +283,12 @@ class ServerSync(google.protobuf.message.Message):
         welcome_text: builtins.str | None = ...,
         permissions: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["max_bandwidth", b"max_bandwidth", "permissions", b"permissions", "session", b"session", "welcome_text", b"welcome_text"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["max_bandwidth", b"max_bandwidth", "permissions", b"permissions", "session", b"session", "welcome_text", b"welcome_text"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["max_bandwidth", b"max_bandwidth", "permissions", b"permissions", "session", b"session", "welcome_text", b"welcome_text"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["max_bandwidth", b"max_bandwidth", "permissions", b"permissions", "session", b"session", "welcome_text", b"welcome_text"]) -> None: ...
 
 global___ServerSync = ServerSync
 
-@typing_extensions.final
+@typing.final
 class ChannelRemove(google.protobuf.message.Message):
     """Sent by the client when it wants a channel removed. Sent by the server when
     a channel has been removed and clients should be notified.
@@ -300,12 +303,12 @@ class ChannelRemove(google.protobuf.message.Message):
         *,
         channel_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["channel_id", b"channel_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["channel_id", b"channel_id"]) -> None: ...
 
 global___ChannelRemove = ChannelRemove
 
-@typing_extensions.final
+@typing.final
 class ChannelState(google.protobuf.message.Message):
     """Used to communicate channel properties between the client and the server.
     Sent by the server during the login process or when channel properties are
@@ -333,21 +336,10 @@ class ChannelState(google.protobuf.message.Message):
     """channel_id of the parent channel."""
     name: builtins.str
     """UTF-8 encoded channel name."""
-    @property
-    def links(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """A collection of channel id values of the linked channels. Absent during
-        the first channel listing.
-        """
     description: builtins.str
     """UTF-8 encoded channel description. Only if the description is less than
     128 bytes
     """
-    @property
-    def links_add(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """A collection of channel_id values that should be added to links."""
-    @property
-    def links_remove(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """A collection of channel_id values that should be removed from links."""
     temporary: builtins.bool
     """True if the channel is temporary."""
     position: builtins.int
@@ -363,6 +355,20 @@ class ChannelState(google.protobuf.message.Message):
     """Whether this channel has enter restrictions (ACL denying ENTER) set"""
     can_enter: builtins.bool
     """Whether the receiver of this msg is considered to be able to enter this channel"""
+    @property
+    def links(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """A collection of channel id values of the linked channels. Absent during
+        the first channel listing.
+        """
+
+    @property
+    def links_add(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """A collection of channel_id values that should be added to links."""
+
+    @property
+    def links_remove(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """A collection of channel_id values that should be removed from links."""
+
     def __init__(
         self,
         *,
@@ -380,12 +386,12 @@ class ChannelState(google.protobuf.message.Message):
         is_enter_restricted: builtins.bool | None = ...,
         can_enter: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["can_enter", b"can_enter", "channel_id", b"channel_id", "description", b"description", "description_hash", b"description_hash", "is_enter_restricted", b"is_enter_restricted", "max_users", b"max_users", "name", b"name", "parent", b"parent", "position", b"position", "temporary", b"temporary"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["can_enter", b"can_enter", "channel_id", b"channel_id", "description", b"description", "description_hash", b"description_hash", "is_enter_restricted", b"is_enter_restricted", "links", b"links", "links_add", b"links_add", "links_remove", b"links_remove", "max_users", b"max_users", "name", b"name", "parent", b"parent", "position", b"position", "temporary", b"temporary"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["can_enter", b"can_enter", "channel_id", b"channel_id", "description", b"description", "description_hash", b"description_hash", "is_enter_restricted", b"is_enter_restricted", "max_users", b"max_users", "name", b"name", "parent", b"parent", "position", b"position", "temporary", b"temporary"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["can_enter", b"can_enter", "channel_id", b"channel_id", "description", b"description", "description_hash", b"description_hash", "is_enter_restricted", b"is_enter_restricted", "links", b"links", "links_add", b"links_add", "links_remove", b"links_remove", "max_users", b"max_users", "name", b"name", "parent", b"parent", "position", b"position", "temporary", b"temporary"]) -> None: ...
 
 global___ChannelState = ChannelState
 
-@typing_extensions.final
+@typing.final
 class UserRemove(google.protobuf.message.Message):
     """Used to communicate user leaving or being kicked. May be sent by the client
     when it attempts to kick a user. Sent by the server when it informs the
@@ -418,12 +424,12 @@ class UserRemove(google.protobuf.message.Message):
         reason: builtins.str | None = ...,
         ban: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["actor", b"actor", "ban", b"ban", "reason", b"reason", "session", b"session"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actor", b"actor", "ban", b"ban", "reason", b"reason", "session", b"session"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["actor", b"actor", "ban", b"ban", "reason", b"reason", "session", b"session"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["actor", b"actor", "ban", b"ban", "reason", b"reason", "session", b"session"]) -> None: ...
 
 global___UserRemove = UserRemove
 
-@typing_extensions.final
+@typing.final
 class UserState(google.protobuf.message.Message):
     """Sent by the server when it communicates new and changed users to client.
     First seen during login procedure. May be sent by the client when it wishes
@@ -432,7 +438,7 @@ class UserState(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class VolumeAdjustment(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -446,8 +452,8 @@ class UserState(google.protobuf.message.Message):
             listening_channel: builtins.int | None = ...,
             volume_adjustment: builtins.float | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["listening_channel", b"listening_channel", "volume_adjustment", b"volume_adjustment"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["listening_channel", b"listening_channel", "volume_adjustment", b"volume_adjustment"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["listening_channel", b"listening_channel", "volume_adjustment", b"volume_adjustment"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["listening_channel", b"listening_channel", "volume_adjustment", b"volume_adjustment"]) -> None: ...
 
     SESSION_FIELD_NUMBER: builtins.int
     ACTOR_FIELD_NUMBER: builtins.int
@@ -524,15 +530,19 @@ class UserState(google.protobuf.message.Message):
     @property
     def temporary_access_tokens(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """A list of temporary access tokens to be respected when processing this request."""
+
     @property
     def listening_channel_add(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """A list of channels the user wants to start listening to."""
+
     @property
     def listening_channel_remove(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """a list of channels the user does no longer want to listen to."""
+
     @property
     def listening_volume_adjustment(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UserState.VolumeAdjustment]:
         """A list of volume adjustments the user has applied to listeners"""
+
     def __init__(
         self,
         *,
@@ -560,12 +570,12 @@ class UserState(google.protobuf.message.Message):
         listening_channel_remove: collections.abc.Iterable[builtins.int] | None = ...,
         listening_volume_adjustment: collections.abc.Iterable[global___UserState.VolumeAdjustment] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["actor", b"actor", "channel_id", b"channel_id", "comment", b"comment", "comment_hash", b"comment_hash", "deaf", b"deaf", "hash", b"hash", "mute", b"mute", "name", b"name", "plugin_context", b"plugin_context", "plugin_identity", b"plugin_identity", "priority_speaker", b"priority_speaker", "recording", b"recording", "self_deaf", b"self_deaf", "self_mute", b"self_mute", "session", b"session", "suppress", b"suppress", "texture", b"texture", "texture_hash", b"texture_hash", "user_id", b"user_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actor", b"actor", "channel_id", b"channel_id", "comment", b"comment", "comment_hash", b"comment_hash", "deaf", b"deaf", "hash", b"hash", "listening_channel_add", b"listening_channel_add", "listening_channel_remove", b"listening_channel_remove", "listening_volume_adjustment", b"listening_volume_adjustment", "mute", b"mute", "name", b"name", "plugin_context", b"plugin_context", "plugin_identity", b"plugin_identity", "priority_speaker", b"priority_speaker", "recording", b"recording", "self_deaf", b"self_deaf", "self_mute", b"self_mute", "session", b"session", "suppress", b"suppress", "temporary_access_tokens", b"temporary_access_tokens", "texture", b"texture", "texture_hash", b"texture_hash", "user_id", b"user_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["actor", b"actor", "channel_id", b"channel_id", "comment", b"comment", "comment_hash", b"comment_hash", "deaf", b"deaf", "hash", b"hash", "mute", b"mute", "name", b"name", "plugin_context", b"plugin_context", "plugin_identity", b"plugin_identity", "priority_speaker", b"priority_speaker", "recording", b"recording", "self_deaf", b"self_deaf", "self_mute", b"self_mute", "session", b"session", "suppress", b"suppress", "texture", b"texture", "texture_hash", b"texture_hash", "user_id", b"user_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["actor", b"actor", "channel_id", b"channel_id", "comment", b"comment", "comment_hash", b"comment_hash", "deaf", b"deaf", "hash", b"hash", "listening_channel_add", b"listening_channel_add", "listening_channel_remove", b"listening_channel_remove", "listening_volume_adjustment", b"listening_volume_adjustment", "mute", b"mute", "name", b"name", "plugin_context", b"plugin_context", "plugin_identity", b"plugin_identity", "priority_speaker", b"priority_speaker", "recording", b"recording", "self_deaf", b"self_deaf", "self_mute", b"self_mute", "session", b"session", "suppress", b"suppress", "temporary_access_tokens", b"temporary_access_tokens", "texture", b"texture", "texture_hash", b"texture_hash", "user_id", b"user_id"]) -> None: ...
 
 global___UserState = UserState
 
-@typing_extensions.final
+@typing.final
 class BanList(google.protobuf.message.Message):
     """Relays information on the bans. The client may send the BanList message to
     either modify the list of bans or query them from the server. The server
@@ -574,7 +584,7 @@ class BanList(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class BanEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -610,30 +620,31 @@ class BanList(google.protobuf.message.Message):
             start: builtins.str | None = ...,
             duration: builtins.int | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["address", b"address", "duration", b"duration", "hash", b"hash", "mask", b"mask", "name", b"name", "reason", b"reason", "start", b"start"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["address", b"address", "duration", b"duration", "hash", b"hash", "mask", b"mask", "name", b"name", "reason", b"reason", "start", b"start"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["address", b"address", "duration", b"duration", "hash", b"hash", "mask", b"mask", "name", b"name", "reason", b"reason", "start", b"start"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["address", b"address", "duration", b"duration", "hash", b"hash", "mask", b"mask", "name", b"name", "reason", b"reason", "start", b"start"]) -> None: ...
 
     BANS_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
-    @property
-    def bans(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___BanList.BanEntry]:
-        """List of ban entries currently in place."""
     query: builtins.bool
     """True if the server should return the list, false if it should replace old
     ban list with the one provided.
     """
+    @property
+    def bans(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___BanList.BanEntry]:
+        """List of ban entries currently in place."""
+
     def __init__(
         self,
         *,
         bans: collections.abc.Iterable[global___BanList.BanEntry] | None = ...,
         query: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["query", b"query"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["bans", b"bans", "query", b"query"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["query", b"query"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["bans", b"bans", "query", b"query"]) -> None: ...
 
 global___BanList = BanList
 
-@typing_extensions.final
+@typing.final
 class TextMessage(google.protobuf.message.Message):
     """Used to send and broadcast text messages."""
 
@@ -646,21 +657,24 @@ class TextMessage(google.protobuf.message.Message):
     MESSAGE_FIELD_NUMBER: builtins.int
     actor: builtins.int
     """The message sender, identified by its session."""
+    message: builtins.str
+    """The UTF-8 encoded message. May be HTML if the server allows."""
     @property
     def session(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """Target users for the message, identified by their session."""
+
     @property
     def channel_id(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """The channels to which the message is sent, identified by their
         channel_ids.
         """
+
     @property
     def tree_id(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """The root channels when sending message recursively to several channels,
         identified by their channel_ids.
         """
-    message: builtins.str
-    """The UTF-8 encoded message. May be HTML if the server allows."""
+
     def __init__(
         self,
         *,
@@ -670,12 +684,12 @@ class TextMessage(google.protobuf.message.Message):
         tree_id: collections.abc.Iterable[builtins.int] | None = ...,
         message: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["actor", b"actor", "message", b"message"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actor", b"actor", "channel_id", b"channel_id", "message", b"message", "session", b"session", "tree_id", b"tree_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["actor", b"actor", "message", b"message"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["actor", b"actor", "channel_id", b"channel_id", "message", b"message", "session", b"session", "tree_id", b"tree_id"]) -> None: ...
 
 global___TextMessage = TextMessage
 
-@typing_extensions.final
+@typing.final
 class PermissionDenied(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -683,7 +697,7 @@ class PermissionDenied(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _DenyTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[PermissionDenied._DenyType.ValueType], builtins.type):  # noqa: F821
+    class _DenyTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[PermissionDenied._DenyType.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         Text: PermissionDenied._DenyType.ValueType  # 0
         """Operation denied for other reason, see reason field."""
@@ -774,16 +788,16 @@ class PermissionDenied(google.protobuf.message.Message):
         type: global___PermissionDenied.DenyType.ValueType | None = ...,
         name: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "name", b"name", "permission", b"permission", "reason", b"reason", "session", b"session", "type", b"type"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "name", b"name", "permission", b"permission", "reason", b"reason", "session", b"session", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["channel_id", b"channel_id", "name", b"name", "permission", b"permission", "reason", b"reason", "session", b"session", "type", b"type"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["channel_id", b"channel_id", "name", b"name", "permission", b"permission", "reason", b"reason", "session", b"session", "type", b"type"]) -> None: ...
 
 global___PermissionDenied = PermissionDenied
 
-@typing_extensions.final
+@typing.final
 class ACL(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class ChanGroup(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -805,14 +819,17 @@ class ACL(google.protobuf.message.Message):
         @property
         def add(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
             """Users explicitly included in this group, identified by user_id."""
+
         @property
         def remove(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
             """Users explicitly removed from this group in this channel if the group
             has been inherited, identified by user_id.
             """
+
         @property
         def inherited_members(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
             """Users inherited, identified by user_id."""
+
         def __init__(
             self,
             *,
@@ -824,10 +841,10 @@ class ACL(google.protobuf.message.Message):
             remove: collections.abc.Iterable[builtins.int] | None = ...,
             inherited_members: collections.abc.Iterable[builtins.int] | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["inherit", b"inherit", "inheritable", b"inheritable", "inherited", b"inherited", "name", b"name"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["add", b"add", "inherit", b"inherit", "inheritable", b"inheritable", "inherited", b"inherited", "inherited_members", b"inherited_members", "name", b"name", "remove", b"remove"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["inherit", b"inherit", "inheritable", b"inheritable", "inherited", b"inherited", "name", b"name"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["add", b"add", "inherit", b"inherit", "inheritable", b"inheritable", "inherited", b"inherited", "inherited_members", b"inherited_members", "name", b"name", "remove", b"remove"]) -> None: ...
 
-    @typing_extensions.final
+    @typing.final
     class ChanACL(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -863,8 +880,8 @@ class ACL(google.protobuf.message.Message):
             grant: builtins.int | None = ...,
             deny: builtins.int | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["apply_here", b"apply_here", "apply_subs", b"apply_subs", "deny", b"deny", "grant", b"grant", "group", b"group", "inherited", b"inherited", "user_id", b"user_id"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["apply_here", b"apply_here", "apply_subs", b"apply_subs", "deny", b"deny", "grant", b"grant", "group", b"group", "inherited", b"inherited", "user_id", b"user_id"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["apply_here", b"apply_here", "apply_subs", b"apply_subs", "deny", b"deny", "grant", b"grant", "group", b"group", "inherited", b"inherited", "user_id", b"user_id"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["apply_here", b"apply_here", "apply_subs", b"apply_subs", "deny", b"deny", "grant", b"grant", "group", b"group", "inherited", b"inherited", "user_id", b"user_id"]) -> None: ...
 
     CHANNEL_ID_FIELD_NUMBER: builtins.int
     INHERIT_ACLS_FIELD_NUMBER: builtins.int
@@ -875,14 +892,16 @@ class ACL(google.protobuf.message.Message):
     """Channel ID of the channel this message affects."""
     inherit_acls: builtins.bool
     """True if the channel inherits its parent's ACLs."""
+    query: builtins.bool
+    """True if the message is a query for ACLs instead of setting them."""
     @property
     def groups(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ACL.ChanGroup]:
         """User group specifications."""
+
     @property
     def acls(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ACL.ChanACL]:
         """ACL specifications."""
-    query: builtins.bool
-    """True if the message is a query for ACLs instead of setting them."""
+
     def __init__(
         self,
         *,
@@ -892,12 +911,12 @@ class ACL(google.protobuf.message.Message):
         acls: collections.abc.Iterable[global___ACL.ChanACL] | None = ...,
         query: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "inherit_acls", b"inherit_acls", "query", b"query"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["acls", b"acls", "channel_id", b"channel_id", "groups", b"groups", "inherit_acls", b"inherit_acls", "query", b"query"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["channel_id", b"channel_id", "inherit_acls", b"inherit_acls", "query", b"query"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["acls", b"acls", "channel_id", b"channel_id", "groups", b"groups", "inherit_acls", b"inherit_acls", "query", b"query"]) -> None: ...
 
 global___ACL = ACL
 
-@typing_extensions.final
+@typing.final
 class QueryUsers(google.protobuf.message.Message):
     """Client may use this message to refresh its registered user information. The
     client should fill the IDs or Names of the users it wants to refresh. The
@@ -911,20 +930,22 @@ class QueryUsers(google.protobuf.message.Message):
     @property
     def ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """user_ids."""
+
     @property
     def names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """User names in the same order as ids."""
+
     def __init__(
         self,
         *,
         ids: collections.abc.Iterable[builtins.int] | None = ...,
         names: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ids", b"ids", "names", b"names"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ids", b"ids", "names", b"names"]) -> None: ...
 
 global___QueryUsers = QueryUsers
 
-@typing_extensions.final
+@typing.final
 class CryptSetup(google.protobuf.message.Message):
     """Used to initialize and resync the UDP encryption. Either side may request a
     resync by sending the message without any values filled. The resync is
@@ -950,12 +971,12 @@ class CryptSetup(google.protobuf.message.Message):
         client_nonce: builtins.bytes | None = ...,
         server_nonce: builtins.bytes | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["client_nonce", b"client_nonce", "key", b"key", "server_nonce", b"server_nonce"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["client_nonce", b"client_nonce", "key", b"key", "server_nonce", b"server_nonce"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["client_nonce", b"client_nonce", "key", b"key", "server_nonce", b"server_nonce"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["client_nonce", b"client_nonce", "key", b"key", "server_nonce", b"server_nonce"]) -> None: ...
 
 global___CryptSetup = CryptSetup
 
-@typing_extensions.final
+@typing.final
 class ContextActionModify(google.protobuf.message.Message):
     """Used to add or remove custom context menu item on client-side."""
 
@@ -965,7 +986,7 @@ class ContextActionModify(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _ContextEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ContextActionModify._Context.ValueType], builtins.type):  # noqa: F821
+    class _ContextEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ContextActionModify._Context.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         Server: ContextActionModify._Context.ValueType  # 1
         """Action is applicable to the server."""
@@ -986,7 +1007,7 @@ class ContextActionModify(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _OperationEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ContextActionModify._Operation.ValueType], builtins.type):  # noqa: F821
+    class _OperationEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ContextActionModify._Operation.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         Add: ContextActionModify._Operation.ValueType  # 0
         Remove: ContextActionModify._Operation.ValueType  # 1
@@ -1021,12 +1042,12 @@ class ContextActionModify(google.protobuf.message.Message):
         context: builtins.int | None = ...,
         operation: global___ContextActionModify.Operation.ValueType | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["action", b"action", "context", b"context", "operation", b"operation", "text", b"text"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "context", b"context", "operation", b"operation", "text", b"text"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["action", b"action", "context", b"context", "operation", b"operation", "text", b"text"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["action", b"action", "context", b"context", "operation", b"operation", "text", b"text"]) -> None: ...
 
 global___ContextActionModify = ContextActionModify
 
-@typing_extensions.final
+@typing.final
 class ContextAction(google.protobuf.message.Message):
     """Sent by the client when it wants to initiate a Context action."""
 
@@ -1048,18 +1069,18 @@ class ContextAction(google.protobuf.message.Message):
         channel_id: builtins.int | None = ...,
         action: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["action", b"action", "channel_id", b"channel_id", "session", b"session"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "channel_id", b"channel_id", "session", b"session"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["action", b"action", "channel_id", b"channel_id", "session", b"session"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["action", b"action", "channel_id", b"channel_id", "session", b"session"]) -> None: ...
 
 global___ContextAction = ContextAction
 
-@typing_extensions.final
+@typing.final
 class UserList(google.protobuf.message.Message):
     """Lists the registered users."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class User(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1081,23 +1102,24 @@ class UserList(google.protobuf.message.Message):
             last_seen: builtins.str | None = ...,
             last_channel: builtins.int | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["last_channel", b"last_channel", "last_seen", b"last_seen", "name", b"name", "user_id", b"user_id"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["last_channel", b"last_channel", "last_seen", b"last_seen", "name", b"name", "user_id", b"user_id"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["last_channel", b"last_channel", "last_seen", b"last_seen", "name", b"name", "user_id", b"user_id"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["last_channel", b"last_channel", "last_seen", b"last_seen", "name", b"name", "user_id", b"user_id"]) -> None: ...
 
     USERS_FIELD_NUMBER: builtins.int
     @property
     def users(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UserList.User]:
         """A list of registered users."""
+
     def __init__(
         self,
         *,
         users: collections.abc.Iterable[global___UserList.User] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["users", b"users"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["users", b"users"]) -> None: ...
 
 global___UserList = UserList
 
-@typing_extensions.final
+@typing.final
 class VoiceTarget(google.protobuf.message.Message):
     """Sent by the client when it wants to register or clear whisper targets.
 
@@ -1107,7 +1129,7 @@ class VoiceTarget(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class Target(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1116,9 +1138,6 @@ class VoiceTarget(google.protobuf.message.Message):
         GROUP_FIELD_NUMBER: builtins.int
         LINKS_FIELD_NUMBER: builtins.int
         CHILDREN_FIELD_NUMBER: builtins.int
-        @property
-        def session(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-            """Users that are included as targets."""
         channel_id: builtins.int
         """Channel that is included as a target."""
         group: builtins.str
@@ -1129,6 +1148,10 @@ class VoiceTarget(google.protobuf.message.Message):
         """True if the voice should also be sent to children of the specific
         channel.
         """
+        @property
+        def session(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+            """Users that are included as targets."""
+
         def __init__(
             self,
             *,
@@ -1138,8 +1161,8 @@ class VoiceTarget(google.protobuf.message.Message):
             links: builtins.bool | None = ...,
             children: builtins.bool | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "children", b"children", "group", b"group", "links", b"links"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "children", b"children", "group", b"group", "links", b"links", "session", b"session"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["channel_id", b"channel_id", "children", b"children", "group", b"group", "links", b"links"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["channel_id", b"channel_id", "children", b"children", "group", b"group", "links", b"links", "session", b"session"]) -> None: ...
 
     ID_FIELD_NUMBER: builtins.int
     TARGETS_FIELD_NUMBER: builtins.int
@@ -1148,18 +1171,19 @@ class VoiceTarget(google.protobuf.message.Message):
     @property
     def targets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___VoiceTarget.Target]:
         """The receivers that this voice target includes."""
+
     def __init__(
         self,
         *,
         id: builtins.int | None = ...,
         targets: collections.abc.Iterable[global___VoiceTarget.Target] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["id", b"id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "targets", b"targets"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["id", b"id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["id", b"id", "targets", b"targets"]) -> None: ...
 
 global___VoiceTarget = VoiceTarget
 
-@typing_extensions.final
+@typing.final
 class PermissionQuery(google.protobuf.message.Message):
     """Sent by the client when it wants permissions for a certain channel. Sent by
     the server when it replies to the query or wants the user to resync all
@@ -1186,12 +1210,12 @@ class PermissionQuery(google.protobuf.message.Message):
         permissions: builtins.int | None = ...,
         flush: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "flush", b"flush", "permissions", b"permissions"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["channel_id", b"channel_id", "flush", b"flush", "permissions", b"permissions"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["channel_id", b"channel_id", "flush", b"flush", "permissions", b"permissions"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["channel_id", b"channel_id", "flush", b"flush", "permissions", b"permissions"]) -> None: ...
 
 global___PermissionQuery = PermissionQuery
 
-@typing_extensions.final
+@typing.final
 class CodecVersion(google.protobuf.message.Message):
     """Sent by the server to notify the users of the version of the CELT codec they
     should use. This may change during the connection when new users join.
@@ -1218,18 +1242,18 @@ class CodecVersion(google.protobuf.message.Message):
         prefer_alpha: builtins.bool | None = ...,
         opus: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["alpha", b"alpha", "beta", b"beta", "opus", b"opus", "prefer_alpha", b"prefer_alpha"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["alpha", b"alpha", "beta", b"beta", "opus", b"opus", "prefer_alpha", b"prefer_alpha"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["alpha", b"alpha", "beta", b"beta", "opus", b"opus", "prefer_alpha", b"prefer_alpha"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["alpha", b"alpha", "beta", b"beta", "opus", b"opus", "prefer_alpha", b"prefer_alpha"]) -> None: ...
 
 global___CodecVersion = CodecVersion
 
-@typing_extensions.final
+@typing.final
 class UserStats(google.protobuf.message.Message):
     """Used to communicate user stats between the server and clients."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class Stats(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1253,8 +1277,8 @@ class UserStats(google.protobuf.message.Message):
             lost: builtins.int | None = ...,
             resync: builtins.int | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["good", b"good", "late", b"late", "lost", b"lost", "resync", b"resync"]) -> None: ...
 
     SESSION_FIELD_NUMBER: builtins.int
     STATS_ONLY_FIELD_NUMBER: builtins.int
@@ -1279,15 +1303,6 @@ class UserStats(google.protobuf.message.Message):
     """User whose stats these are."""
     stats_only: builtins.bool
     """True if the message contains only mutable stats (packets, ping)."""
-    @property
-    def certificates(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.bytes]:
-        """Full user certificate chain of the user certificate in DER format."""
-    @property
-    def from_client(self) -> global___UserStats.Stats:
-        """Packet statistics for packets received from the client."""
-    @property
-    def from_server(self) -> global___UserStats.Stats:
-        """Packet statistics for packets sent by the server."""
     udp_packets: builtins.int
     """Amount of UDP packets sent."""
     tcp_packets: builtins.int
@@ -1300,14 +1315,6 @@ class UserStats(google.protobuf.message.Message):
     """TCP ping average."""
     tcp_ping_var: builtins.float
     """TCP ping variance."""
-    @property
-    def version(self) -> global___Version:
-        """Client version."""
-    @property
-    def celt_versions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """A list of CELT bitstream version constants supported by the client of this
-        user.
-        """
     address: builtins.bytes
     """Client IP address."""
     bandwidth: builtins.int
@@ -1319,6 +1326,28 @@ class UserStats(google.protobuf.message.Message):
     strong_certificate: builtins.bool
     """True if the user has a strong certificate."""
     opus: builtins.bool
+    @property
+    def certificates(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.bytes]:
+        """Full user certificate chain of the user certificate in DER format."""
+
+    @property
+    def from_client(self) -> global___UserStats.Stats:
+        """Packet statistics for packets received from the client."""
+
+    @property
+    def from_server(self) -> global___UserStats.Stats:
+        """Packet statistics for packets sent by the server."""
+
+    @property
+    def version(self) -> global___Version:
+        """Client version."""
+
+    @property
+    def celt_versions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """A list of CELT bitstream version constants supported by the client of this
+        user.
+        """
+
     def __init__(
         self,
         *,
@@ -1342,12 +1371,12 @@ class UserStats(google.protobuf.message.Message):
         strong_certificate: builtins.bool | None = ...,
         opus: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["address", b"address", "bandwidth", b"bandwidth", "from_client", b"from_client", "from_server", b"from_server", "idlesecs", b"idlesecs", "onlinesecs", b"onlinesecs", "opus", b"opus", "session", b"session", "stats_only", b"stats_only", "strong_certificate", b"strong_certificate", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var", "version", b"version"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["address", b"address", "bandwidth", b"bandwidth", "celt_versions", b"celt_versions", "certificates", b"certificates", "from_client", b"from_client", "from_server", b"from_server", "idlesecs", b"idlesecs", "onlinesecs", b"onlinesecs", "opus", b"opus", "session", b"session", "stats_only", b"stats_only", "strong_certificate", b"strong_certificate", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var", "version", b"version"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["address", b"address", "bandwidth", b"bandwidth", "from_client", b"from_client", "from_server", b"from_server", "idlesecs", b"idlesecs", "onlinesecs", b"onlinesecs", "opus", b"opus", "session", b"session", "stats_only", b"stats_only", "strong_certificate", b"strong_certificate", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var", "version", b"version"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["address", b"address", "bandwidth", b"bandwidth", "celt_versions", b"celt_versions", "certificates", b"certificates", "from_client", b"from_client", "from_server", b"from_server", "idlesecs", b"idlesecs", "onlinesecs", b"onlinesecs", "opus", b"opus", "session", b"session", "stats_only", b"stats_only", "strong_certificate", b"strong_certificate", "tcp_packets", b"tcp_packets", "tcp_ping_avg", b"tcp_ping_avg", "tcp_ping_var", b"tcp_ping_var", "udp_packets", b"udp_packets", "udp_ping_avg", b"udp_ping_avg", "udp_ping_var", b"udp_ping_var", "version", b"version"]) -> None: ...
 
 global___UserStats = UserStats
 
-@typing_extensions.final
+@typing.final
 class RequestBlob(google.protobuf.message.Message):
     """Used by the client to request binary data from the server. By default large
     comments or textures are not sent within standard messages but instead the
@@ -1367,12 +1396,15 @@ class RequestBlob(google.protobuf.message.Message):
     @property
     def session_texture(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """sessions of the requested UserState textures."""
+
     @property
     def session_comment(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """sessions of the requested UserState comments."""
+
     @property
     def channel_description(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """channel_ids of the requested ChannelState descriptions."""
+
     def __init__(
         self,
         *,
@@ -1380,11 +1412,11 @@ class RequestBlob(google.protobuf.message.Message):
         session_comment: collections.abc.Iterable[builtins.int] | None = ...,
         channel_description: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["channel_description", b"channel_description", "session_comment", b"session_comment", "session_texture", b"session_texture"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["channel_description", b"channel_description", "session_comment", b"session_comment", "session_texture", b"session_texture"]) -> None: ...
 
 global___RequestBlob = RequestBlob
 
-@typing_extensions.final
+@typing.final
 class ServerConfig(google.protobuf.message.Message):
     """Sent by the server when it informs the clients on server configuration
     details.
@@ -1424,12 +1456,12 @@ class ServerConfig(google.protobuf.message.Message):
         max_users: builtins.int | None = ...,
         recording_allowed: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["allow_html", b"allow_html", "image_message_length", b"image_message_length", "max_bandwidth", b"max_bandwidth", "max_users", b"max_users", "message_length", b"message_length", "recording_allowed", b"recording_allowed", "welcome_text", b"welcome_text"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["allow_html", b"allow_html", "image_message_length", b"image_message_length", "max_bandwidth", b"max_bandwidth", "max_users", b"max_users", "message_length", b"message_length", "recording_allowed", b"recording_allowed", "welcome_text", b"welcome_text"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["allow_html", b"allow_html", "image_message_length", b"image_message_length", "max_bandwidth", b"max_bandwidth", "max_users", b"max_users", "message_length", b"message_length", "recording_allowed", b"recording_allowed", "welcome_text", b"welcome_text"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["allow_html", b"allow_html", "image_message_length", b"image_message_length", "max_bandwidth", b"max_bandwidth", "max_users", b"max_users", "message_length", b"message_length", "recording_allowed", b"recording_allowed", "welcome_text", b"welcome_text"]) -> None: ...
 
 global___ServerConfig = ServerConfig
 
-@typing_extensions.final
+@typing.final
 class SuggestConfig(google.protobuf.message.Message):
     """Sent by the server to inform the clients of suggested client configuration
     specified by the server administrator.
@@ -1461,12 +1493,12 @@ class SuggestConfig(google.protobuf.message.Message):
         positional: builtins.bool | None = ...,
         push_to_talk: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["positional", b"positional", "push_to_talk", b"push_to_talk", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["positional", b"positional", "push_to_talk", b"push_to_talk", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["positional", b"positional", "push_to_talk", b"push_to_talk", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["positional", b"positional", "push_to_talk", b"push_to_talk", "version_v1", b"version_v1", "version_v2", b"version_v2"]) -> None: ...
 
 global___SuggestConfig = SuggestConfig
 
-@typing_extensions.final
+@typing.final
 class PluginDataTransmission(google.protobuf.message.Message):
     """Used to send plugin messages between clients"""
 
@@ -1478,15 +1510,16 @@ class PluginDataTransmission(google.protobuf.message.Message):
     DATAID_FIELD_NUMBER: builtins.int
     senderSession: builtins.int
     """The session ID of the client this message was sent from"""
-    @property
-    def receiverSessions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """The session IDs of the clients that should receive this message"""
     data: builtins.bytes
     """The data that is sent"""
     dataID: builtins.str
     """The ID of the sent data. This will be used by plugins to check whether they will
     process it or not
     """
+    @property
+    def receiverSessions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """The session IDs of the clients that should receive this message"""
+
     def __init__(
         self,
         *,
@@ -1495,7 +1528,7 @@ class PluginDataTransmission(google.protobuf.message.Message):
         data: builtins.bytes | None = ...,
         dataID: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["data", b"data", "dataID", b"dataID", "senderSession", b"senderSession"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["data", b"data", "dataID", b"dataID", "receiverSessions", b"receiverSessions", "senderSession", b"senderSession"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["data", b"data", "dataID", b"dataID", "senderSession", b"senderSession"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "dataID", b"dataID", "receiverSessions", b"receiverSessions", "senderSession", b"senderSession"]) -> None: ...
 
 global___PluginDataTransmission = PluginDataTransmission
