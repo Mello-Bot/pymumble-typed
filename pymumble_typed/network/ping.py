@@ -1,22 +1,24 @@
 from __future__ import annotations
 
+from asyncio import BaseEventLoop
 from typing import TYPE_CHECKING
+
+from pymumble_typed.utils.timer import AsyncTimer
 
 if TYPE_CHECKING:
     from pymumble_typed.network.control import ControlStack, Status
 
-from threading import Timer
 from time import time
 
 from pymumble_typed import MessageType
 from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket
 
 
-class Ping(Timer):
+class Ping(AsyncTimer):
     DELAY = 10
 
-    def __init__(self, control: ControlStack):
-        super().__init__(Ping.DELAY, self.send)
+    def __init__(self, control: ControlStack, loop: BaseEventLoop):
+        super().__init__(Ping.DELAY, self.send, loop=loop)
         self.last_receive = 0.
         self.time_send = 0.
         self.number = 1
@@ -31,11 +33,8 @@ class Ping(Timer):
         self.last = 0
         self._control = control
 
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.function(*self.args, **self.kwargs)
-
-    def send(self):
+    async def send(self):
+        print("Sending ping")
         packet = PingPacket()
         packet.timestamp = int(time())
         packet.tcp_ping_avg = self.average
@@ -49,10 +48,9 @@ class Ping(Timer):
         packet.lost = self.udp_lost
         self.time_send = int(time() * 1000)
         self.last = time()
-        self._control.send_message(MessageType.PingPacket, packet)
+        await self._control.send_message(MessageType.PingPacket, packet)
         if self.last_receive != 0 and time() > self.last_receive + 60:
             self._control.status = Status.NOT_CONNECTED
-        return True
 
     def receive(self, _: PingPacket):
         self.last_receive = int(time() * 1000)

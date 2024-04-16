@@ -58,16 +58,16 @@ class Callbacks:
         self._callbacks = CallbackDict()
         self._pool = ThreadPool()
 
-    def dispatch(self, _type: CallbackLiteral, *args):
+    async def dispatch(self, _type: CallbackLiteral, *args):
         try:
-            callback = self._callbacks[_type]
-            self._pool.apply_async(callback, args)
+            callback = await self._callbacks[_type]
         except KeyError:
-            pass
-        except TypeError:
-            pass
+            return
+        try:
+            await callback(args)
         except Exception:
             self._client.logger.error("Error while executing callback", exc_info=True)
+
 
     def disable(self):
         self._callbacks = {}

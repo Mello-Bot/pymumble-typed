@@ -205,18 +205,18 @@ class Users(dict[int, User]):
         self._myself_session = None
         self._lock = Lock()
 
-    def handle_update(self, packet: UserState):
+    async def handle_update(self, packet: UserState):
         self._lock.acquire()
         try:
             user = self[packet.session]
             actor = self[packet.actor]
             before = user.update(packet)
-            self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
+            await self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
         except KeyError:
             user = User(self._mumble, packet)
             self[packet.session] = user
             if packet.session != self._myself_session:
-                self._mumble.callbacks.dispatch("on_user_created", user)
+                await self._mumble.callbacks.dispatch("on_user_created", user)
             else:
                 self.myself = user
         self._lock.release()
