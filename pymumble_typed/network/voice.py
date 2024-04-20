@@ -29,7 +29,7 @@ class VoiceStack:
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.control = control
         self.active = False
-        self._listen_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
+        self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
         self._conn_check_thread = Thread(target=self._conn_check, name="ControlStack:ConnCheck")
         self._crypt_lock = Lock()
         self._last_lost = 0
@@ -90,7 +90,7 @@ class VoiceStack:
         self.socket.settimeout(None)
         self.active = True
         self._signal_protocol_change()
-        self._listen_thread = Thread(target=self._listen, name="ControlStack:ListenLoop")
+        self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
         self._listen_thread.start()
 
     def sync(self):
@@ -123,7 +123,7 @@ class VoiceStack:
     def _listen(self):
         while self.active and not self.exit and self.control.is_connected():
             try:
-                response = self.socket.recv(2048)
+                response = self.socket.recv(512)
                 decrypted = self.ocb.decrypt(response)
                 self._dispatcher(decrypted)
             except BlockingIOError:
