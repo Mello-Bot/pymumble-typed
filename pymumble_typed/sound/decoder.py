@@ -4,19 +4,21 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Callable
-    from gevent.threadpool import ThreadPool
     from pymumble_typed.sound import AudioType
 
 from logging import Logger
 from multiprocessing import cpu_count
 
 try:
-    import gevent
-    from gevent import monkey
+    from gevent import monkey, get_hub
+    if monkey.is_anything_patched():
+        from gevent.threadpool import ThreadPool
+    else:
+        from multiprocessing.pool import ThreadPool as StdThreadPool
 except ModuleNotFoundError:
-    from multiprocessing.pool import ThreadPool
+    from multiprocessing.pool import ThreadPool as StdThreadPool
 except ImportError:
-    from multiprocessing.pool import ThreadPool
+    from multiprocessing.pool import ThreadPool as StdThreadPool
 
 from opuslib import Decoder as OpusDecoder
 from pymumble_typed.sound import SAMPLE_RATE, READ_BUFFER_SIZE
@@ -39,12 +41,12 @@ class Decoder:
     def __init__(self, on_decoded: Callable[[(bytes, int, AudioType, int)], None], logger: Logger):
         try:
             if monkey.is_anything_patched():
-                self._pool: ThreadPool = gevent.get_hub().threadpool
+                self._pool: ThreadPool = get_hub().threadpool
                 self._pool.maxsize = cpu_count() - 1
             else:
-                self._pool = ThreadPool(processes=cpu_count() - 1, initializer=initializer)
+                self._pool = StdThreadPool(processes=1, initializer=initializer)
         except:
-            self._pool = ThreadPool(processes=cpu_count() - 1, initializer=initializer)
+            self._pool = StdThreadPool(processes=1, initializer=initializer)
         self._on_decoded = on_decoded
         self._logger = logger
 
