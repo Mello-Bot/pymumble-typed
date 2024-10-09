@@ -76,7 +76,11 @@ class VoiceOutput:
         audio.sequence = self._sequence
         audio.positional = self.positional
         self._voice.send_packet(audio)
-        sleep(audio_per_packet - (time() - self._sequence_last_time))
+        delay = audio_per_packet - (time() - self._sequence_last_time)
+        if delay >= 0:
+            sleep(delay)
+        else:
+            self._control.logger.warning(f"VoiceOutput::send_audio: delay is negative: {delay}!")
 
     @property
     def encoder(self):
