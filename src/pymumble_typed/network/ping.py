@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.pymumble_typed.network.control import ControlStack, Status
+    from pymumble_typed.network.control import ControlStack, Status
 
 from threading import Timer
 from time import time
 
-from src.pymumble_typed import MessageType
-from src.pymumble_typed.protobuf import Ping as PingPacket
+from pymumble_typed import MessageType
+from pymumble_typed.protobuf import Ping as PingPacket
 
 
 class Ping(Timer):

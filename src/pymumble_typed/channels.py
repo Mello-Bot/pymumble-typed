@@ -3,17 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.pymumble_typed.protobuf import ChannelState, RequestBlob
-    from src.pymumble_typed.mumble import Mumble
-    from src.pymumble_typed.users import User
+    from pymumble_typed.protobuf import ChannelState, RequestBlob
+    from pymumble_typed.mumble import Mumble
+    from pymumble_typed.users import User
 
 from struct import unpack
 
-from src.pymumble_typed.acl import ACL
-from src.pymumble_typed.commands import CreateChannel, RemoveChannel, Move, TextMessage, LinkChannel, UnlinkChannel, \
+from pymumble_typed.acl import ACL
+from pymumble_typed.commands import CreateChannel, RemoveChannel, Move, TextMessage, LinkChannel, UnlinkChannel, \
     UpdateChannel, QueryACL
 
-from src.pymumble_typed.protobuf import RequestBlob
+from pymumble_typed.protobuf import RequestBlob
 
 from threading import Lock
 

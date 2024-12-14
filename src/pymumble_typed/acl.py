@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.pymumble_typed.protobuf import (ACL as ACLPacket)
-    from src.pymumble_typed.mumble import Mumble
+    from pymumble_typed.protobuf import (ACL as ACLPacket)
+    from pymumble_typed.mumble import Mumble
 
 from threading import Lock
 

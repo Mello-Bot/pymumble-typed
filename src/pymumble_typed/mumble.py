@@ -7,23 +7,23 @@ from threading import current_thread
 
 from typing import TypedDict
 
-from src.pymumble_typed import MessageType, UdpMessageType
-from src.pymumble_typed.callbacks import Callbacks
-from src.pymumble_typed.channels import Channels
-from src.pymumble_typed.commands import Command
-from src.pymumble_typed.messages import Message as MessageContainer
-from src.pymumble_typed.network import ConnectionRejectedError
-from src.pymumble_typed.network.control import ControlStack, Status
-from src.pymumble_typed.network.voice import VoiceStack
-from src.pymumble_typed.protobuf import Audio, Ping as UdpPingPacket
-from src.pymumble_typed.protobuf import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
+from pymumble_typed import MessageType, UdpMessageType
+from pymumble_typed.callbacks import Callbacks
+from pymumble_typed.channels import Channels
+from pymumble_typed.commands import Command
+from pymumble_typed.messages import Message as MessageContainer
+from pymumble_typed.network import ConnectionRejectedError
+from pymumble_typed.network.control import ControlStack, Status
+from pymumble_typed.network.voice import VoiceStack
+from pymumble_typed.protobuf import Audio, Ping as UdpPingPacket
+from pymumble_typed.protobuf import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
     RequestBlob, ServerConfig, UDPTunnel
-from src.pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
-from src.pymumble_typed.sound.voice import VoiceOutput
-from src.pymumble_typed.tools import VarInt
-from src.pymumble_typed.users import Users
+from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
+from pymumble_typed.sound.voice import VoiceOutput
+from pymumble_typed.tools import VarInt
+from pymumble_typed.users import Users
 
 
 class ClientType(IntEnum):

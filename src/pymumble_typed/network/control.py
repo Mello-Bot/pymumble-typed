@@ -8,16 +8,16 @@ from threading import Thread, current_thread, Lock
 from time import sleep
 from typing import TYPE_CHECKING
 
-from src.pymumble_typed import MessageType
-from src.pymumble_typed.commands import Command
-from src.pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
-from src.pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, READ_BUFFER_SIZE
-from src.pymumble_typed.network.ping import Ping
-from src.pymumble_typed.network.udp_data import AudioData
-from src.pymumble_typed.protobuf import Version, Authenticate
+from pymumble_typed import MessageType
+from pymumble_typed.commands import Command
+from pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
+from pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, READ_BUFFER_SIZE
+from pymumble_typed.network.ping import Ping
+from pymumble_typed.network.udp_data import AudioData
+from pymumble_typed.protobuf import Version, Authenticate
 
 if TYPE_CHECKING:
-    from src.pymumble_typed.mumble import ClientType
+    from pymumble_typed.mumble import ClientType
     from google.protobuf.message import Message
     from logging import Logger
     from ssl import SSLSocket
