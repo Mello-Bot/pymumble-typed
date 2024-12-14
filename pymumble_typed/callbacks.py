@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from multiprocessing.pool import ThreadPool
-from typing import TYPE_CHECKING, Callable
-
-from typing_extensions import TypedDict, Literal
+from typing import TYPE_CHECKING, Callable, TypedDict, Literal
 
 if TYPE_CHECKING:
-    from typing_extensions import NotRequired
+    from typing import NotRequired
     from pymumble_typed.sound.soundqueue import SoundChunk
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.users import User

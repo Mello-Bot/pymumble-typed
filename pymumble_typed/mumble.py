@@ -5,7 +5,7 @@ from enum import IntEnum
 from logging import Logger, ERROR, DEBUG, StreamHandler
 from threading import current_thread
 
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.callbacks import Callbacks
