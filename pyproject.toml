@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "my-project"
+name = "pymumble-typed"
 version = "4.0.0"
 dependencies = [
     "pycryptodomex==3.21.0",
