@@ -9,7 +9,7 @@ from threading import Timer
 from time import time
 
 from pymumble_typed import MessageType
-from pymumble_typed.protobuf import Ping as PingPacket
+from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket
 
 
 class Ping(Timer):

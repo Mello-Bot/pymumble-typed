@@ -15,8 +15,8 @@ from pymumble_typed.messages import Message as MessageContainer
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
 from pymumble_typed.network.voice import VoiceStack
-from pymumble_typed.protobuf import Audio, Ping as UdpPingPacket
-from pymumble_typed.protobuf import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping as UdpPingPacket
+from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
     ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
     CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
     RequestBlob, ServerConfig, UDPTunnel

@@ -14,7 +14,7 @@ from pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
 from pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, READ_BUFFER_SIZE
 from pymumble_typed.network.ping import Ping
 from pymumble_typed.network.udp_data import AudioData
-from pymumble_typed.protobuf import Version, Authenticate
+from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate
 
 if TYPE_CHECKING:
     from pymumble_typed.mumble import ClientType

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.network.control import ControlStack
 from pymumble_typed.network.udp_data import PingData, UDPData
-from pymumble_typed.protobuf import Ping
+
 from pymumble_typed.tools import VarInt
 
 if TYPE_CHECKING:
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 from pymumble_typed.crypto.ocb2 import CryptStateOCB2
 from socket import socket, AF_INET, SOCK_DGRAM, timeout, gaierror
 
-from pymumble_typed.protobuf import CryptSetup
+from pymumble_typed.protobuf.Mumble_pb2 import CryptSetup
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
 
 
 class VoiceStack:

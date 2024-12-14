@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 from pymumble_typed import MessageType
 
-from pymumble_typed.protobuf import UserState, TextMessage as TextMessagePacket, ChannelState, \
+from pymumble_typed.protobuf.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, \
     ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL
 
 from pymumble_typed.messages import ImageTooBigError, TextTooLongError

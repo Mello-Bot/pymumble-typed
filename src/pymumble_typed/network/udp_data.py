@@ -2,8 +2,8 @@ from struct import pack
 from time import time_ns
 
 from pymumble_typed import UdpMessageType, MessageType
-from pymumble_typed.protobuf import Audio, Ping
-from pymumble_typed.protobuf import UDPTunnel
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping
+from pymumble_typed.protobuf.Mumble_pb2 import UDPTunnel
 from pymumble_typed.sound import AudioType
 from pymumble_typed.tools import VarInt
 
