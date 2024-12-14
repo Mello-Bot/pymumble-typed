@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING, Callable, TypedDict, Literal
 
 if TYPE_CHECKING:
     from typing import NotRequired
-    from pymumble_typed.sound.soundqueue import SoundChunk
-    from pymumble_typed.mumble import Mumble
-    from pymumble_typed.users import User
-    from pymumble_typed.messages import Message
-    from pymumble_typed.channels import Channel
+    from src.pymumble_typed.sound.soundqueue import SoundChunk
+    from src.pymumble_typed.mumble import Mumble
+    from src.pymumble_typed.users import User
+    from src.pymumble_typed.messages import Message
+    from src.pymumble_typed.channels import Channel
 
     CallbackLiteral = Literal[
         "on_connect", "on_disconnect",

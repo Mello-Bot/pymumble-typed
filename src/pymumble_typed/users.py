@@ -3,16 +3,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.channels import Channel
-    from pymumble_typed.mumble import Mumble
-    from pymumble_typed.protobuf.Mumble_pb2 import UserState, UserRemove
-    from pymumble_typed.sound.soundqueue import SoundChunk
+    from src.pymumble_typed.channels import Channel
+    from src.pymumble_typed.mumble import Mumble
+    from src.pymumble_typed.protobuf import UserState, UserRemove
 from struct import unpack
 from threading import Lock
 
-from pymumble_typed.sound.soundqueue import LegacySoundQueue
-from pymumble_typed.protobuf.Mumble_pb2 import RequestBlob
-from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser
+from src.pymumble_typed.sound.soundqueue import LegacySoundQueue
+from src.pymumble_typed.protobuf import RequestBlob
+from src.pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser
 
 
 class User:

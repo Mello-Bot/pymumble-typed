@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from google.protobuf.message import Message
-    from pymumble_typed.mumble import Mumble
+    from src.pymumble_typed.mumble import Mumble
 
-from pymumble_typed import MessageType
+from src.pymumble_typed import MessageType
 
-from pymumble_typed.protobuf.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, \
+from src.pymumble_typed.protobuf import UserState, TextMessage as TextMessagePacket, ChannelState, \
     ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL
 
-from pymumble_typed.messages import ImageTooBigError, TextTooLongError
+from src.pymumble_typed.messages import ImageTooBigError, TextTooLongError
 
 
 class Command:

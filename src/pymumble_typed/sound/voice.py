@@ -1,11 +1,11 @@
 from queue import Queue
 from time import time, sleep
 
-from pymumble_typed.network.control import ControlStack
-from pymumble_typed.network.udp_data import AudioData
-from pymumble_typed.network.voice import VoiceStack
-from pymumble_typed.sound import SEQUENCE_RESET_INTERVAL, SEQUENCE_DURATION
-from pymumble_typed.sound.encoder import Encoder
+from src.pymumble_typed.network.control import ControlStack
+from src.pymumble_typed.network.udp_data import AudioData
+from src.pymumble_typed.network.voice import VoiceStack
+from src.pymumble_typed.sound import SEQUENCE_RESET_INTERVAL, SEQUENCE_DURATION
+from src.pymumble_typed.sound.encoder import Encoder
 
 
 class VoiceOutput:

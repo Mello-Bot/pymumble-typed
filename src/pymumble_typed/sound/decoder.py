@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Callable
-    from pymumble_typed.sound import AudioType
+    from src.pymumble_typed.sound import AudioType
 
 from logging import Logger
 from multiprocessing.pool import ThreadPool
 
 from opuslib import Decoder as OpusDecoder
-from pymumble_typed.sound import SAMPLE_RATE, READ_BUFFER_SIZE
+from src.pymumble_typed.sound import SAMPLE_RATE, READ_BUFFER_SIZE
 
 decoder: OpusDecoder = OpusDecoder(SAMPLE_RATE, 2)
 
