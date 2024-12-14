@@ -1,4 +1,4 @@
-pycryptodome==3.21.0
+pycryptodomex==3.21.0
 opuslib==3.0.1
 protobuf==5.29.1
 types-protobuf==5.29.1.20241207
