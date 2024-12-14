@@ -1,7 +1,6 @@
 pycryptodome==3.21.0
 opuslib==3.0.1
-protobuf==5.27.0
-mypy-protobuf==3.6.0
-types-protobuf==5.26.0.20240422
-typing_extensions==4.11.0
+protobuf==5.29.1
+types-protobuf==5.29.1.20241207
+typing_extensions==4.12.2
 
