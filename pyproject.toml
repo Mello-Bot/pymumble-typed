@@ -46,5 +46,6 @@ Issues = "https://github.com/Mello-Bot/pymumble-typed/issues"
 
 [project.optional-dependencies]
 dev = [
-    "types-protobuf==5.29.1.20241207",
+    "grpcio-tools==1.68.1",
+    "types-protobuf==5.29.1.20241207"
 ]
