@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from asyncio import new_event_loop
 from threading import Thread, Lock
 from time import sleep, time, time_ns
 from typing import TYPE_CHECKING
@@ -23,6 +24,9 @@ from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
 
 class VoiceStack:
     def __init__(self, control: ControlStack, logger: Logger):
+        self._listen_thread = None
+        self.event_loop = new_event_loop()
+
         self.exit = False
         self.addr = (control.host, control.port)
         self.logger = logger
@@ -70,16 +74,16 @@ class VoiceStack:
         for listener in self._protocol_switch_listeners:
             listener(self.active)
 
-    def _sync(self):
+    async def _sync(self):
         self.socket.settimeout(3)
-        self.ping(True, False)
+        await self.ping(True, False)
         try:
             response = self.socket.recv(2048)
         except timeout:
             self.logger.warning("VoiceStack: Couldn't initialize UDP connection. Falling back to TCP.")
             self.active = False
             self._signal_protocol_change()
-            self._conn_check_thread.start()
+            await self.event_loop.create_task(self._conn_check())
             return
         self._crypt_lock.acquire(True)
         decrypted = self.ocb.decrypt(response)
@@ -94,18 +98,17 @@ class VoiceStack:
         self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
         self._listen_thread.start()
 
-    def sync(self):
-        thread = Thread(target=self._sync, name="VoiceStack:CryptSetup")
-        thread.start()
+    async def sync(self):
+        await self._sync()
 
-    def ping(self, enforce=False, request_extended_information=False):
+    async def ping(self, enforce=False, request_extended_information=False):
         packet = PingData()
         packet.request_extended_information = request_extended_information
         self.ping_sent += 1
         self.last_ping = packet
-        self.send_packet(packet, enforce)
+        await self.send_packet(packet, enforce)
 
-    def send_packet(self, data: UDPData, enforce=False):
+    async def send_packet(self, data: UDPData, enforce=False):
         if self.active or enforce:
             self.logger.debug(f"VoiceStack: sending {data.type.name}")
             packet = data.serialized_udp_packet if self.control.server_version >= (1, 5, 0) else data.legacy_udp_packet
@@ -119,7 +122,7 @@ class VoiceStack:
         elif not data.is_ping:
             self.control.enqueue_audio(data)
         else:
-            self.control.ping.send()
+            await self.control.ping.send()
 
     def _listen(self):
         while self.active and not self.exit and self.control.is_connected():
@@ -179,7 +182,7 @@ class VoiceStack:
             if time() - self._last_good_ping > 15:
                 self.active = False
                 self._signal_protocol_change()
-            self.ping(True, False)  # not self._extended_info)
+            self.event_loop.create_task(self.ping(True, False))  # not self._extended_info)
 
     def stop(self):
         self.exit = True

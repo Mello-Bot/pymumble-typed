@@ -26,14 +26,26 @@ class Channel:
         self.name: str = packet.name
         self._parent: int = packet.parent
         self._description_hash: bytes = packet.description_hash
-        self.description: str = ""
+        self._description: str = ""
         self.temporary: bool = packet.temporary
         self.position = packet.position
         self.max_users = packet.max_users
         self.can_enter = packet.can_enter
         self.is_enter_restricted = packet.is_enter_restricted
         self.links: list[int] = packet.links
-        self._get_description()
+
+    async def _get_description(self):
+        if not self._description_hash:
+            return
+        packet = RequestBlob()
+        packet.channel_description.extend(unpack("!5I", self._description_hash))
+        await self._mumble.request_blob(packet)
+
+    @property
+    async def description(self) -> str:
+        if not self._description:
+            await self._get_description()
+        return self._description
 
     def update(self, packet: ChannelState):
         actions = {}
@@ -72,13 +84,6 @@ class Channel:
             else:
                 self._get_description()
         return actions
-
-    def _get_description(self):
-        if not self._description_hash:
-            return
-        packet = RequestBlob()
-        packet.channel_description.extend(unpack("!5I", self._description_hash))
-        self._mumble.request_blob(packet)
 
     @property
     def parent(self) -> Channel | None:
@@ -162,25 +167,25 @@ class Channels(dict[int, Channel]):
     def current(self):
         return self._mumble.users.myself.channel()
 
-    def handle_update(self, packet: ChannelState):
+    async def handle_update(self, packet: ChannelState):
         self._lock.acquire()
         try:
             channel = self[packet.channel_id]
             before = channel.update(packet)
-            self._mumble.callbacks.dispatch("on_channel_updated", channel, before)
+            await self._mumble.callbacks.dispatch("on_channel_updated", channel, before)
         except KeyError:
             channel = Channel(self._mumble, packet)
             self[packet.channel_id] = channel
-            self._mumble.callbacks.dispatch("on_channel_created", channel)
+            await self._mumble.callbacks.dispatch("on_channel_created", channel)
         self._lock.release()
 
-    def remove(self, channel_id: int):
+    # TODO: channel is not actually removed?
+    async def remove(self, channel_id: int):
         self._lock.acquire()
-
         try:
             channel = self[channel_id]
             del self[channel_id]
-            self._mumble.callbacks.dispatch("on_channel_removed", channel)
+            await self._mumble.callbacks.dispatch("on_channel_removed", channel)
         except KeyError:
             pass
         self._lock.release()

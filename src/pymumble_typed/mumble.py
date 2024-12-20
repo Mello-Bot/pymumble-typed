@@ -101,9 +101,9 @@ class Mumble:
     def ready(self):
         return self._ready
 
-    def start(self):
+    async def start(self):
         self._init()
-        self._control.connect()
+        await self._control.connect()
 
     def _init(self):
         self._bandwidth = BANDWIDTH
@@ -141,7 +141,7 @@ class Mumble:
                     self._logger.debug(f"Mumble: updated server max bandwidth per client {self._server_max_bandwidth}")
                 self._voice.ping_response(packet)
 
-    def _dispatch_legacy_voice_message(self, packet: bytes):
+    async def _dispatch_legacy_voice_message(self, packet: bytes):
         pos = 0
         (header,) = struct.unpack("!B", bytes([packet[pos]]))
         _type = (header & 0b11100000) >> 5
@@ -149,16 +149,16 @@ class Mumble:
         if _type == AudioType.PING:
             self._voice.ping_legacy_response(packet[1:])
         else:
-            self._legacy_sound_received(_type, target, packet[1:])
+            await self._legacy_sound_received(_type, target, packet[1:])
 
-    def _dispatch_control_message(self, _type: int, message: bytes):
+    async def _dispatch_control_message(self, _type: int, message: bytes):
         try:
             self._logger.debug(f"Mumble: Received TCP packet type: {MessageType(_type).name}")
         except ValueError:
             self._logger.debug(f"Mumble: Received TCP packet type: {_type}")
         if _type == MessageType.UDPTunnel and self.sound_receive:
             if self._control.server_version < (1, 5, 0):
-                self._dispatch_legacy_voice_message(message)
+                await self._dispatch_legacy_voice_message(message)
             else:
                 packet = UDPTunnel()
                 packet.ParseFromString(message)
@@ -191,7 +191,7 @@ class Mumble:
         elif _type == MessageType.ServerSync:
             packet = ServerSync()
             packet.ParseFromString(message)
-            self._voice.sync()
+            await self._voice.sync()
             self.users.set_myself(packet.session)
             self.set_bandwidth(packet.max_bandwidth)
             if self._control.status == Status.AUTHENTICATING:
@@ -199,42 +199,42 @@ class Mumble:
                 self._ready = True
                 self._control.ready()
                 self._callbacks.ready()
-                self._callbacks.dispatch("on_connect")
+                await self._callbacks.dispatch("on_connect")
         elif _type == MessageType.ChannelRemove:
             packet = ChannelRemove()
             packet.ParseFromString(message)
-            self.channels.remove(packet.channel_id)
+            await self.channels.remove(packet.channel_id)
         elif _type == MessageType.ChannelState:
             packet = ChannelState()
             packet.ParseFromString(message)
-            self.channels.handle_update(packet)
+            await self.channels.handle_update(packet)
         elif _type == MessageType.UserRemove:
             packet = UserRemove()
             packet.ParseFromString(message)
-            self.users.remove(packet)
+            await self.users.remove(packet)
         elif _type == MessageType.UserState:
             packet = UserState()
             packet.ParseFromString(message)
-            self.users.handle_update(packet)
+            await self.users.handle_update(packet)
         elif _type == MessageType.BanList:
             packet = BanList()
             packet.ParseFromString(message)
         elif _type == MessageType.TextMessage:
             packet = TextMessage()
             packet.ParseFromString(message)
-            self._callbacks.dispatch("on_message", MessageContainer(self, packet))
+            await self._callbacks.dispatch("on_message", MessageContainer(self, packet))
         elif _type == MessageType.PermissionDenied:
             packet = PermissionDenied()
             packet.ParseFromString(message)
             # FIXME: CALLBACK Permission Denied
-            self._callbacks.dispatch("on_permission_denied", packet.session, packet.channel_id, packet.name,
+            await self._callbacks.dispatch("on_permission_denied", packet.session, packet.channel_id, packet.name,
                                      packet.type, packet.reason)
         elif _type == MessageType.ACL:
             packet = ACL()
             packet.ParseFromString(message)
             self.channels[packet.channel_id].update_acl(packet)
             # FIXME: CALLBACK ACL
-            self._callbacks.dispatch("on_acl_received")
+            await self._callbacks.dispatch("on_acl_received")
         elif _type == MessageType.QueryUsers:
             packet = QueryUsers()
             packet.ParseFromString(message)
@@ -242,12 +242,12 @@ class Mumble:
             packet = CryptSetup()
             packet.ParseFromString(message)
             self._voice.crypt_setup(packet)
-            self._voice.ping()
+            await self._voice.ping()
         elif _type == MessageType.ContextActionModify:
             packet = ContextActionModify()
             packet.ParseFromString(message)
             # FIXME: CALLBACK ContextActionModify
-            self._callbacks.dispatch("on_context_action")
+            await self._callbacks.dispatch("on_context_action")
         elif _type == MessageType.ContextAction:
             packet = ContextAction()
             packet.ParseFromString(message)
@@ -286,7 +286,7 @@ class Mumble:
             self._bandwidth = min(bandwidth, self._server_max_bandwidth)
         self.voice.encoder.bandwidth = self._bandwidth
 
-    def _legacy_sound_received(self, _type: AudioType, target: int, packet: bytes):
+    async def _legacy_sound_received(self, _type: AudioType, target: int, packet: bytes):
         pos = 0
         session = VarInt()
         pos += session.decode(packet[pos: pos + 10])
@@ -318,7 +318,7 @@ class Mumble:
                     sound = user.sound.add(packet[pos:pos + size], sequence.value, _type, target)
                     if sound is None:
                         return
-                    self._callbacks.dispatch("on_sound_received", user, sound)
+                    await self._callbacks.dispatch("on_sound_received", user, sound)
                     sequence.value += int(round(sound.duration / 100))
                 except CodecNotSupportedError:
                     self._logger.error("Codec not supported", exc_info=True)
@@ -351,10 +351,10 @@ class Mumble:
     def is_ready(self):
         self._control.is_ready()
 
-    def execute_command(self, cmd: Command, blocking: bool = True):
+    async def execute_command(self, cmd: Command, blocking: bool = True):
         if blocking:
             self.is_ready()
-        self._control.send_message(cmd.type, cmd.packet)
+        await self._control.send_message(cmd.type, cmd.packet)
         return None
 
     def get_max_message_length(self) -> int:
@@ -366,21 +366,21 @@ class Mumble:
     def stop(self):
         self._control.disconnect()
 
-    def request_blob(self, packet):
-        self._control.send_message(MessageType.RequestBlob, packet)
+    async def request_blob(self, packet):
+        await self._control.send_message(MessageType.RequestBlob, packet)
 
     def reauthenticate(self, token):
         self._control.reauthenticate(token)
 
-    def set_whisper(self, target_ids: list[int], channel=False):
+    async def set_whisper(self, target_ids: list[int], channel=False):
         self.voice.target = 1 if channel else 2
         command = VoiceTarget()
         command.id = self.voice.target
         command.targets.extend(target_ids)
-        self.execute_command(command)
+        await self.execute_command(command)
 
-    def remove_whisper(self):
+    async def remove_whisper(self):
         self.voice.target = 0
         command = VoiceTarget()
         command.id = self.voice.target
-        self.execute_command(command)
+        await self.execute_command(command)

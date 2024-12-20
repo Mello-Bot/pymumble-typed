@@ -30,10 +30,8 @@ class User:
         self.suppressed = packet.suppress
         self._texture_hash = packet.texture_hash
         self._comment_hash = packet.comment_hash
-        self.comment: str = ""
-        self.texture: str = ""
-        self._update_comment()
-        self._update_texture()
+        self._comment: str = ""
+        self._texture: str = ""
         self._users = self._mumble.users
 
     def myself(self):
@@ -81,94 +79,94 @@ class User:
     def channel(self):
         return self._mumble.channels[self.channel_id]
 
-    def _update_comment(self):
+    async def _update_comment(self):
         if not self._comment_hash:
             return
         packet = RequestBlob()
         packet.session_comment.extend(unpack("!5I", self._comment_hash))
-        self._mumble.request_blob(packet)
+        await self._mumble.request_blob(packet)
 
-    def _update_texture(self):
+    async def _update_texture(self):
         if not self._texture_hash:
             return
         packet = RequestBlob()
         packet.session_texture.extend(unpack("!5I", self._texture_hash))
-        self._mumble.request_blob(packet)
+        await self._mumble.request_blob(packet)
 
-    def mute(self, myself: bool = False, action: bool = True):
+    async def mute(self, myself: bool = False, action: bool = True):
         if self.myself() and myself:
             command = ModUserState(self.session, self_mute=action)
         else:
             command = ModUserState(self.session, mute=action)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def unmute(self, myself: bool = False):
-        self.mute(myself, False)
+    async def unmute(self, myself: bool = False):
+        await self.mute(myself, False)
 
-    def deafen(self, myself: bool = False, action: bool = True):
+    async def deafen(self, myself: bool = False, action: bool = True):
         if self.myself() and myself:
             command = ModUserState(self.session, self_deaf=action)
         else:
             command = ModUserState(self.session, deaf=action)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def undeafen(self, myself: bool = False):
-        self.deafen(myself, False)
+    async def undeafen(self, myself: bool = False):
+        await self.deafen(myself, False)
 
-    def suppress(self, action: bool = True):
+    async def suppress(self, action: bool = True):
         command = ModUserState(self.session, suppress=action)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def unsuppress(self):
-        self.suppress(False)
+    async def unsuppress(self):
+        await self.suppress(False)
 
-    def recording(self, action: bool = True):
+    async def recording(self, action: bool = True):
         command = ModUserState(self.session, recording=action)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def unrecording(self):
-        self.recording(False)
+    async def unrecording(self):
+        await self.recording(False)
 
-    def set_comment(self, comment: str):
+    async def set_comment(self, comment: str):
         command = ModUserState(self.session, comment=comment)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def set_texture(self, texture: str):
+    async def set_texture(self, texture: str):
         command = ModUserState(self.session, texture=texture)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def register(self):  # TODO: check if this is correct
+    async def register(self):  # TODO: check if this is correct
         command = ModUserState(self.session, user_id=0)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def update_context(self, context_name: bytes):
+    async def update_context(self, context_name: bytes):
         command = ModUserState(self.session, plugin_context=context_name)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def move_in(self, channel: Channel, token: str = None):
+    async def move_in(self, channel: Channel, token: str = None):
         if token:
-            self._mumble.reauthenticate(token)
+            await self._mumble.reauthenticate(token)
         command = Move(self.session, channel.id)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def send_text_message(self, message: str):
+    async def send_text_message(self, message: str):
         command = TextPrivateMessage(self._mumble, self.session, message)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def kick(self, permanent: bool = False, reason: str = ""):
+    async def kick(self, permanent: bool = False, reason: str = ""):
         command = RemoveUser(self.session, reason=reason, ban=permanent)
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def ban(self, reason: str = ""):
-        self.kick(True, reason)
+    async def ban(self, reason: str = ""):
+        await self.kick(True, reason)
 
-    def add_listening_channel(self, channel: Channel):
+    async def add_listening_channel(self, channel: Channel):
         command = ModUserState(self.session, listening_channel_add=[channel.id])
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
-    def remove_listening_channel(self, channel: Channel):
+    async def remove_listening_channel(self, channel: Channel):
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
-        self._mumble.execute_command(command)
+        await self._mumble.execute_command(command)
 
     def __eq__(self, other: User):
         return self.hash == other.hash
@@ -204,18 +202,18 @@ class Users(dict[int, User]):
         self._myself_session = None
         self._lock = Lock()
 
-    def handle_update(self, packet: UserState):
+    async def handle_update(self, packet: UserState):
         self._lock.acquire()
         try:
             user = self[packet.session]
             actor = self[packet.actor]
             before = user.update(packet)
-            self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
+            await self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
         except KeyError:
             user = User(self._mumble, packet)
             self[packet.session] = user
             if packet.session != self._myself_session:
-                self._mumble.callbacks.dispatch("on_user_created", user)
+                await self._mumble.callbacks.dispatch("on_user_created", user)
             else:
                 self.myself = user
         self._lock.release()
