@@ -20,11 +20,9 @@ class AsyncTimer:
         return self._finished
 
     def start(self):
-        return self._loop.create_task(self._start(), name=self.__class__.__name__)
+        return self._start()
 
     async def _start(self):
-        print("Sleeping", self._interval)
-        await sleep(self._interval)
         self._timer_expired = True
         if self._args and self._kwargs:
             await self._function(*self._args, **self._kwargs)
@@ -34,6 +32,7 @@ class AsyncTimer:
             await self._function(*self._args)
         else:
             await self._function()
+        await sleep(self._interval)
         self._finished = True
 
     def cancel(self):

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import struct
 from enum import IntEnum
-from logging import Logger, ERROR, DEBUG, StreamHandler
+from logging import Logger, ERROR, DEBUG, StreamHandler, Formatter
+from logging.config import dictConfig
 from threading import current_thread
 
 from typing import TypedDict
@@ -48,7 +49,14 @@ class Mumble:
         self._ready = False
         self._debug = debug
         self._parent_thread = current_thread()
-        self._logger = logger if logger else Logger("PyMumble-Typed")
+        if logger:
+            self._logger = logger.getChild("Mumble")
+        else:
+            handler = StreamHandler()
+            handler.setFormatter(Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s"))
+            self._logger = Logger("Mumble")
+            self._logger.handlers.clear()
+            self._logger.addHandler(handler)
         self._logger.setLevel(DEBUG if debug else ERROR)
         if not logger:
             self._logger.addHandler(StreamHandler())
@@ -354,7 +362,7 @@ class Mumble:
     async def execute_command(self, cmd: Command, blocking: bool = True):
         if blocking:
             self.is_ready()
-        await self._control.send_message(cmd.type, cmd.packet)
+        await self._control.enqueue_command(cmd)
         return None
 
     def get_max_message_length(self) -> int:
@@ -366,6 +374,7 @@ class Mumble:
     def stop(self):
         self._control.disconnect()
 
+    # TODO: enqueue request_blob
     async def request_blob(self, packet):
         await self._control.send_message(MessageType.RequestBlob, packet)
 

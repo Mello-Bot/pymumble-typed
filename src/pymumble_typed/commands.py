@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,7 +10,7 @@ if TYPE_CHECKING:
 from pymumble_typed import MessageType
 
 from pymumble_typed.protobuf.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, \
-    ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL
+    ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL, Ping as PingPacket
 
 from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 
@@ -20,6 +21,24 @@ class Command:
         self.type: MessageType = MessageType.PingPacket
         self.response = False
         self.packet: Message | None = None
+
+
+class Ping(Command):
+    def __init__(self, average: float, variance: float, number: int,
+                 udp_packets: int, udp_ping_average: float, udp_ping_variance: float,
+                 udp_good: int, udp_late:int, udp_lost: int):
+        super().__init__()
+        self.packet = PingPacket()
+        self.packet.timestamp = int(time())
+        self.packet.tcp_ping_avg = average
+        self.packet.tcp_ping_var = variance
+        self.packet.tcp_packets = number
+        self.packet.udp_packets = udp_packets
+        self.packet.udp_ping_avg = udp_ping_average
+        self.packet.udp_ping_var = udp_ping_variance
+        self.packet.good = udp_good
+        self.packet.late = udp_late
+        self.packet.lost = udp_lost
 
 
 class Move(Command):

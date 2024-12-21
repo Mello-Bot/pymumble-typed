@@ -24,8 +24,9 @@ from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
 
 class VoiceStack:
     def __init__(self, control: ControlStack, logger: Logger):
-        self._listen_thread = None
+        self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
         self.event_loop = new_event_loop()
+        self._event_thread = Thread(target=lambda:self.event_loop.run_forever(), name="VoiceStack:EventLoop")
 
         self.exit = False
         self.addr = (control.host, control.port)
@@ -33,8 +34,7 @@ class VoiceStack:
         self.ocb = CryptStateOCB2()
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.control = control
-        self.active = False
-        self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
+        self.active = True
         self._conn_check_thread = Thread(target=self._conn_check, name="ControlStack:ConnCheck")
         self._crypt_lock = Lock()
         self._last_lost = 0
@@ -120,12 +120,13 @@ class VoiceStack:
             except (gaierror, timeout):
                 self.logger.error("Exception occurred while sending UDP packet", exc_info=True)
         elif not data.is_ping:
-            self.control.enqueue_audio(data)
+            await self.control.enqueue_audio(data)
         else:
-            await self.control.ping.send()
+            self.control.ping.send()
 
     def _listen(self):
         while self.active and not self.exit and self.control.is_connected():
+            self.logger.debug("VoiceStack: Listening UDP")
             try:
                 response = self.socket.recv(512)
                 decrypted = self.ocb.decrypt(response)
@@ -180,6 +181,7 @@ class VoiceStack:
         while not self.exit and self.control.is_connected():
             sleep(10)
             if time() - self._last_good_ping > 15:
+                self.logger.debug("VoiceStack: Connection to UDP lost")
                 self.active = False
                 self._signal_protocol_change()
             self.event_loop.create_task(self.ping(True, False))  # not self._extended_info)

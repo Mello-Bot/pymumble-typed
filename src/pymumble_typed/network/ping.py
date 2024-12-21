@@ -1,22 +1,23 @@
 from __future__ import annotations
 
+from threading import Timer
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from asyncio import BaseEventLoop
+    from asyncio import AbstractEventLoop
     from pymumble_typed.network.control import ControlStack, Status
 
 from time import time
-
+from asyncio import run_coroutine_threadsafe
 from pymumble_typed import MessageType
 from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket
-from pymumble_typed.utils.timer import AsyncTimer
+from pymumble_typed.commands import Ping as PingCommand
 
-class Ping(AsyncTimer):
+class Ping(Timer):
     DELAY = 10
 
-    def __init__(self, control: ControlStack, loop: BaseEventLoop):
-        super().__init__(Ping.DELAY, self.send, loop=loop)
+    def __init__(self, control: ControlStack, loop: AbstractEventLoop):
+        super().__init__(Ping.DELAY, self.send)
         self.last_receive = 0.
         self.time_send = 0.
         self.number = 1
@@ -30,22 +31,26 @@ class Ping(AsyncTimer):
         self.udp_lost: int = 0
         self.last = 0
         self._control = control
+        self._loop = loop
+        self._logger = self._control.logger.getChild("Ping")
 
-    async def send(self):
-        packet = PingPacket()
-        packet.timestamp = int(time())
-        packet.tcp_ping_avg = self.average
-        packet.tcp_ping_var = self.variance
-        packet.tcp_packets = self.number
-        packet.udp_packets = self.udp_packets
-        packet.udp_ping_avg = self.udp_ping_average
-        packet.udp_ping_var = self.udp_ping_variance
-        packet.good = self.udp_good
-        packet.late = self.udp_late
-        packet.lost = self.udp_lost
+    def send(self):
+        self._logger.debug("Sending ping")
+        cmd = PingCommand(
+            self.average,
+            self.variance,
+            self.number,
+            self.udp_packets,
+            self.udp_ping_average,
+            self.udp_ping_variance,
+            self.udp_good,
+            self.udp_late,
+            self.udp_lost
+        )
         self.time_send = int(time() * 1000)
         self.last = time()
-        await self._control.send_message(MessageType.PingPacket, packet)
+        self._control.logger.debug("Sending ping")
+        run_coroutine_threadsafe(self._control.enqueue_command(cmd), self._loop)
         if self.last_receive != 0 and time() > self.last_receive + 60:
             self._control.status = Status.NOT_CONNECTED
         return True

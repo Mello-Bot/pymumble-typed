@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from asyncio import new_event_loop, run_coroutine_threadsafe
 from multiprocessing.pool import ThreadPool
+from threading import Thread
 from typing import TYPE_CHECKING, Callable, TypedDict, Literal
 
 if TYPE_CHECKING:
@@ -58,8 +60,9 @@ class Callbacks:
 
     async def dispatch(self, _type: CallbackLiteral, *args):
         try:
+            loop = new_event_loop()
             cb = self._callbacks[_type]
-            await cb(*args)
+            self._pool.apply_async(lambda : loop.run_until_complete(cb(*args)))
         except KeyError:
             pass
         except TypeError:

@@ -24,10 +24,10 @@ class VoiceOutput:
         self._sequence = 0
 
     # Legacy code support
-    def add_sound(self, pcm: bytes):
-        self.add_pcm(pcm)
+    async def add_sound(self, pcm: bytes):
+        await self.add_pcm(pcm)
 
-    def add_pcm(self, pcm: bytes):
+    async def add_pcm(self, pcm: bytes):
         if len(pcm) % 2 != 0:
             raise ValueError("pcm data must be 16 bits")
         samples = self._encoder.samples
@@ -41,7 +41,7 @@ class VoiceOutput:
         for i in range(0, offset * samples, samples):
             self._buffer.put(pcm[i:i + samples])
         self._remaining_sample = pcm[i:]
-        self.send_audio()
+        await self.send_audio()
 
     def _update_sequence(self):
         audio_per_packet = self._encoder.audio_per_packet
@@ -62,7 +62,7 @@ class VoiceOutput:
     def clear_buffer(self):
         self._buffer = Queue()
 
-    def send_audio(self):
+    async def send_audio(self):
         audio_per_packet = self._encoder.audio_per_packet
         self._update_sequence()
         audio = AudioData()
@@ -75,7 +75,7 @@ class VoiceOutput:
         audio.target = self.target
         audio.sequence = self._sequence
         audio.positional = self.positional
-        self._voice.send_packet(audio)
+        await self._voice.send_packet(audio)
         delay = audio_per_packet - (time() - self._sequence_last_time)
         if delay >= 0:
             sleep(delay)
