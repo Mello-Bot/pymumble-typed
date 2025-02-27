@@ -5,7 +5,7 @@ class MessageType(IntEnum):
     Version = 0
     UDPTunnel = 1
     Authenticate = 2
-    PingPacket = 3
+    Ping = 3
     Reject = 4
     ServerSync = 5
     ChannelRemove = 6

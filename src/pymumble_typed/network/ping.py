@@ -49,7 +49,7 @@ class Ping(Timer):
         packet.lost = self.udp_lost
         self.time_send = int(time() * 1000)
         self.last = time()
-        self._control.send_message(MessageType.PingPacket, packet)
+        self._control.send_message(MessageType.Ping, packet)
         if self.last_receive != 0 and time() > self.last_receive + 60:
             self._control.status = Status.NOT_CONNECTED
         return True

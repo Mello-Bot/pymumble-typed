@@ -10,16 +10,13 @@ from typing import TypedDict
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
-from pymumble_typed.commands import Command
+from pymumble_typed.commands import Command, VoiceTarget
 from pymumble_typed.messages import Message as MessageContainer
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
 from pymumble_typed.network.voice import VoiceStack
+from pymumble_typed.protobuf import Mumble_pb2
 from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping as UdpPingPacket
-from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate, Ping as PingPacket, Reject, ServerSync, \
-    ChannelRemove, ChannelState, UserRemove, UserState, BanList, TextMessage, PermissionDenied, ACL, QueryUsers, \
-    CryptSetup, ContextActionModify, ContextAction, UserList, VoiceTarget, PermissionQuery, CodecVersion, UserStats, \
-    RequestBlob, ServerConfig, UDPTunnel
 from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
 from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
@@ -160,126 +157,81 @@ class Mumble:
             if self._control.server_version < (1, 5, 0):
                 self._dispatch_legacy_voice_message(message)
             else:
-                packet = UDPTunnel()
+                packet = Mumble_pb2.UDPTunnel()
                 packet.ParseFromString(message)
                 udp_packet = Audio()
                 udp_packet.ParseFromString(packet.packet)
                 self._sound_received(udp_packet)
-        elif _type == MessageType.Version:
-            packet = Version()
-            packet.ParseFromString(message)
-            self._control.set_version(packet)
-            self._logger.debug(f"Mumble: Received version: {packet.version_v1}")
-            if self._control.server_version < (1, 5, 0):
-                self._voice.set_voice_message_dispatcher(self._dispatch_legacy_voice_message)
-            else:
-                self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
-        elif _type == MessageType.Authenticate:
-            packet = Authenticate()
-            packet.ParseFromString(message)
-            self._logger.debug(f"Mumble: Received authenticate. Session: {packet.session}")
-        elif _type == MessageType.PingPacket:
-            packet = PingPacket()
-            packet.ParseFromString(message)
-            self._control.ping.receive(packet)
-        elif _type == MessageType.Reject:
-            packet = Reject()
-            packet.ParseFromString(message)
-            self._control.status = Status.FAILED
-            self._control.ready()
-            raise ConnectionRejectedError(packet.reason)
-        elif _type == MessageType.ServerSync:
-            packet = ServerSync()
-            packet.ParseFromString(message)
-            self._voice.sync()
-            self.users.set_myself(packet.session)
-            self.set_bandwidth(packet.max_bandwidth)
-            if self._control.status == Status.AUTHENTICATING:
-                self._control.status = Status.CONNECTED
-                self._ready = True
+            return
+
+        msg_type = MessageType(_type)
+        MsgClass = getattr(Mumble_pb2, msg_type.name)
+        packet = MsgClass()
+        packet.ParseFromString(message)
+        match msg_type:
+            case MessageType.Version:
+                self._control.set_version(packet)
+                self._logger.debug(f"Mumble: Received version: {packet.version_v1}")
+                if self._control.server_version < (1, 5, 0):
+                    self._voice.set_voice_message_dispatcher(self._dispatch_legacy_voice_message)
+                else:
+                    self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
+            case MessageType.Authenticate:
+                self._logger.debug(f"Mumble: Received authenticate. Session: {packet.session}")
+            case MessageType.Ping:
+                self._control.ping.receive(packet)
+            case MessageType.Reject:
+                self._control.status = Status.FAILED
                 self._control.ready()
-                self._callbacks.ready()
-                self._callbacks.dispatch("on_connect")
-        elif _type == MessageType.ChannelRemove:
-            packet = ChannelRemove()
-            packet.ParseFromString(message)
-            self.channels.remove(packet.channel_id)
-        elif _type == MessageType.ChannelState:
-            packet = ChannelState()
-            packet.ParseFromString(message)
-            self.channels.handle_update(packet)
-        elif _type == MessageType.UserRemove:
-            packet = UserRemove()
-            packet.ParseFromString(message)
-            self.users.remove(packet)
-        elif _type == MessageType.UserState:
-            packet = UserState()
-            packet.ParseFromString(message)
-            self.users.handle_update(packet)
-        elif _type == MessageType.BanList:
-            packet = BanList()
-            packet.ParseFromString(message)
-        elif _type == MessageType.TextMessage:
-            packet = TextMessage()
-            packet.ParseFromString(message)
-            self._callbacks.dispatch("on_message", MessageContainer(self, packet))
-        elif _type == MessageType.PermissionDenied:
-            packet = PermissionDenied()
-            packet.ParseFromString(message)
-            # FIXME: CALLBACK Permission Denied
-            self._callbacks.dispatch("on_permission_denied", packet.session, packet.channel_id, packet.name,
-                                     packet.type, packet.reason)
-        elif _type == MessageType.ACL:
-            packet = ACL()
-            packet.ParseFromString(message)
-            self.channels[packet.channel_id].update_acl(packet)
-            # FIXME: CALLBACK ACL
-            self._callbacks.dispatch("on_acl_received")
-        elif _type == MessageType.QueryUsers:
-            packet = QueryUsers()
-            packet.ParseFromString(message)
-        elif _type == MessageType.CryptSetup:
-            packet = CryptSetup()
-            packet.ParseFromString(message)
-            self._voice.crypt_setup(packet)
-            self._voice.ping()
-        elif _type == MessageType.ContextActionModify:
-            packet = ContextActionModify()
-            packet.ParseFromString(message)
-            # FIXME: CALLBACK ContextActionModify
-            self._callbacks.dispatch("on_context_action")
-        elif _type == MessageType.ContextAction:
-            packet = ContextAction()
-            packet.ParseFromString(message)
-        elif _type == MessageType.UserList:
-            packet = UserList()
-            packet.ParseFromString(message)
-        elif _type == MessageType.VoiceTarget:
-            packet = VoiceTarget()
-            packet.ParseFromString(message)
-        elif _type == MessageType.PermissionQuery:
-            packet = PermissionQuery()
-            packet.ParseFromString(message)
-        elif _type == MessageType.CodecVersion:
-            packet = CodecVersion()
-            packet.ParseFromString(message)
-        elif _type == MessageType.UserStats:
-            packet = UserStats()
-            packet.ParseFromString(message)
-        elif _type == MessageType.RequestBlob:
-            packet = RequestBlob()
-            packet.ParseFromString(message)
-        elif _type == MessageType.ServerConfig:
-            packet = ServerConfig()
-            packet.ParseFromString(message)
-            if packet.HasField("max_bandwidth"):
-                self._server_max_bandwidth = packet.max_bandwidth
-            if packet.HasField("allow_html"):
-                self.settings["server_allow_html"] = packet.allow_html
-            if packet.HasField("message_length"):
-                self.settings["server_max_message_length"] = packet.message_length
-            if packet.HasField("image_message_length"):
-                self.settings["server_max_image_message_length"] = packet.image_message_length
+                raise ConnectionRejectedError(packet.reason)
+            case MessageType.ServerSync:
+                self._voice.sync()
+                self.users.set_myself(packet.session)
+                self.set_bandwidth(packet.max_bandwidth)
+                if self._control.status == Status.AUTHENTICATING:
+                    self._control.status = Status.CONNECTED
+                    self._ready = True
+                    self._control.ready()
+                    self._callbacks.ready()
+                    self._callbacks.dispatch("on_connect")
+            case MessageType.ChannelRemove:
+                self.channels.remove(packet.channel_id)
+            case MessageType.ChannelState:
+                self.channels.handle_update(packet)
+            case MessageType.UserRemove:
+                self.users.remove(packet)
+            case MessageType.UserState:
+                self.users.handle_update(packet)
+            case MessageType.BanList:
+                pass
+            case MessageType.TextMessage:
+                self._callbacks.dispatch("on_message", MessageContainer(self, packet))
+            case MessageType.PermissionDenied:
+                self._callbacks.dispatch("on_permission_denied", packet.session, packet.channel_id, packet.name,
+                                         packet.type, packet.reason)
+            case MessageType.ACL:
+                self.channels[packet.channel_id].update_acl(packet)
+                # FIXME: CALLBACK ACL
+                self._callbacks.dispatch("on_acl_received")
+            case MessageType.QueryUsers:
+                pass
+            case MessageType.CryptSetup:
+                self._voice.crypt_setup(packet)
+                self._voice.ping()
+            case MessageType.ContextActionModify:
+                # FIXME: CALLBACK ContextActionModify
+                self._callbacks.dispatch("on_context_action")
+            case MessageType.ContextAction | MessageType.UserList | MessageType.VoiceTarget | MessageType.PermissionQuery | MessageType.CodecVersion | MessageType.UserStats | MessageType.RequestBlob:
+                pass
+            case MessageType.ServerConfig:
+                if packet.HasField("max_bandwidth"):
+                    self._server_max_bandwidth = packet.max_bandwidth
+                if packet.HasField("allow_html"):
+                    self.settings["server_allow_html"] = packet.allow_html
+                if packet.HasField("message_length"):
+                    self.settings["server_max_message_length"] = packet.message_length
+                if packet.HasField("image_message_length"):
+                    self.settings["server_max_image_message_length"] = packet.image_message_length
 
     def set_bandwidth(self, bandwidth: int):
         if self._server_max_bandwidth is not None:
@@ -374,13 +326,10 @@ class Mumble:
 
     def set_whisper(self, target_ids: list[int], channel=False):
         self.voice.target = 1 if channel else 2
-        command = VoiceTarget()
-        command.id = self.voice.target
-        command.targets.extend(target_ids)
+        command = VoiceTarget(self.voice.target, target_ids)
         self.execute_command(command)
 
     def remove_whisper(self):
         self.voice.target = 0
-        command = VoiceTarget()
-        command.id = self.voice.target
+        command = VoiceTarget(self.voice.target, [])
         self.execute_command(command)
