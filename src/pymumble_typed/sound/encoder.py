@@ -86,6 +86,8 @@ class Encoder:
 
     @audio_per_packet.setter
     def audio_per_packet(self, adp: float):
+        if adp not in (0.0025, 0.005, 0.01, 0.02, 0.04, 0.06):
+            raise ValueError(f"Invalid audio frame duration: {adp}. It must be in [0.0025, 0.005, 0.01, 0.02, 0.04, 0.06].")
         self._audio_per_packet = adp
         # FIXME: this is changing the framesize
         self._calc_samples()
