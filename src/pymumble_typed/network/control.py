@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
-from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLZeroReturnError
+from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLError
 from struct import pack, unpack
 from threading import Thread, current_thread, Lock
 from time import sleep
@@ -157,7 +157,7 @@ class ControlStack:
                 if sent < 0:
                     raise socket_error("ControlStack: Server socket error")
                 packet = packet[sent:]
-            except SSLZeroReturnError:
+            except SSLError:
                 self.status = Status.FAILED
 
     def _read_control_messages(self):
@@ -216,8 +216,7 @@ class ControlStack:
     def loop(self):
         self.logger.debug("ControlStack: Entering loop")
         self.logger.debug(self.status)
-        while (
-                self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
+        while (self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
             self.ping = Ping(self)
             if not self.is_connected():
                 self.logger.debug("ControlStack: Reconnecting...")
