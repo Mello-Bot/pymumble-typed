@@ -44,7 +44,7 @@ class ControlStack:
         self.client_type = client_type
         self.cert_file = cert_file
         self.key_file = key_file
-        self.logger = logger
+        self.logger = logger.getChild(self.__class__.__name__)
         self.version_string: str = f"PyMumble-Typed {VERSION}"
         self.status = Status.NOT_CONNECTED
         self._disconnect = False
@@ -104,22 +104,22 @@ class ControlStack:
         self.receive_buffer = bytes()
         self._disconnect = False
         try:
-            self.logger.debug("ControlStack: Connecting to the server")
+            self.logger.debug("connecting to the server")
             info = getaddrinfo(self.host, self.port, AF_UNSPEC, SOCK_STREAM)
             socket_ = socket(info[0][0], SOCK_STREAM)
             socket_.settimeout(10)
         except socket_error as exc:
             self.status = Status.FAILED
-            self.logger.error("Failed to connect to the server", exc_info=True)
+            self.logger.error("failed to connect to the server", exc_info=True)
             raise exc
 
         try:
-            self.logger.debug("ControlStack: Setting up TLS")
+            self.logger.debug("setting up TLS")
             context = SSLContext(PROTOCOL_TLSv1_2)
             context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
             self.socket = context.wrap_socket(socket_)
         except AttributeError:
-            self.logger.warning("Invalid TLS version, trying TLSv1")
+            self.logger.warning("invalid TLS version, trying TLSv1")
             context = SSLContext(PROTOCOL_TLSv1)
             context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
             self.socket = context.wrap_socket(socket_)
@@ -128,19 +128,19 @@ class ControlStack:
             self.socket.connect((self.host, self.port))
         except socket_error as se:
             self.status = Status.FAILED
-            self.logger.error("ControlStack: Error while upgrading to encrypted connection", exc_info=True)
+            self.logger.error("error while upgrading to encrypted connection", exc_info=True)
             raise se
 
         try:
-            self.logger.debug("ControlStack: Sending version")
+            self.logger.debug("sending version")
             version = self._craft_version_packet()
             self.send_message(MessageType.Version, version)
-            self.logger.debug("ControlStack: Authenticating...")
+            self.logger.debug("authenticating...")
             authenticate = self._craft_authentication_packet()
             self.send_message(MessageType.Authenticate, authenticate)
         except socket_error as exc:
             self.status = Status.FAILED
-            self.logger.error("ControlStack: Failed to send authentication messages", exc_info=True)
+            self.logger.error("failed to send authentication messages", exc_info=True)
             raise exc
         self.status = Status.AUTHENTICATING
         if not self.thread.is_alive():
@@ -151,17 +151,17 @@ class ControlStack:
         self._on_disconnect = func
 
     def send_message(self, _type: MessageType, message: Message):
-        self.logger.debug(f"ControlStack: sending TCP {_type.name}")
+        self.logger.debug(f"sending TCP {_type.name}")
         packet = pack("!HL", _type.value, message.ByteSize()) + message.SerializeToString()
         while len(packet) > 0:
             try:
                 sent = self.socket.send(packet)
                 if sent < 0:
-                    raise socket_error("ControlStack: Server socket error")
+                    raise socket_error("server socket error")
                 packet = packet[sent:]
             except SSLError:
                 self.logger.debug(
-                    f"ControlStack: an SSL error occurred while sending {_type.name}. Attempting to reconnect and resend the packet.")
+                    f"an SSL error occurred while sending {_type.name}. Attempting to reconnect and resend the packet.")
                 self.status = Status.FAILED
                 # Attempt to resend the message on connection failed
                 cmd = Command()
@@ -176,7 +176,7 @@ class ControlStack:
         except TimeoutError:
             return
         except socket_error:
-            self.logger.error("ControlStack: Error while reading control messages", exc_info=True)
+            self.logger.error("error while reading control messages", exc_info=True)
             return
 
         while len(self.receive_buffer) >= 6:
@@ -204,9 +204,9 @@ class ControlStack:
         while len(tcp_packet) > 0:
             try:
                 sent = self.socket.send(tcp_packet)
-                self.logger.debug(f"ControlStack: audio sent {sent}")
+                self.logger.debug(f"audio sent {sent}")
                 if sent < 0:
-                    self.logger.error("ControlStack: Server socket error")
+                    self.logger.error("server socket error")
                     self.status = Status.FAILED
                     return
                 tcp_packet = tcp_packet[sent:]
@@ -215,7 +215,7 @@ class ControlStack:
                 return
 
     def send_audio(self, audio: AudioData):
-        self.logger.debug(f"ControlStack: sending audio protobuf")
+        self.logger.debug(f"sending audio protobuf")
         self.send_message(MessageType.UDPTunnel, audio.tcp_packet)
 
     def _listen(self):
@@ -232,48 +232,48 @@ class ControlStack:
                 self._voice_dispatcher(audio)
             self._read_control_messages()
         self._ready.release()
-        self.logger.debug(f"ControlStack: Exiting. Status: {self.status} Exit: {exit_}")
+        self.logger.debug(f"exiting. Status: {self.status} Exit: {exit_}")
 
     def loop(self):
-        self.logger.debug("ControlStack: Entering loop")
+        self.logger.debug("entering loop")
         self.logger.debug(self.status)
         while (
                 self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
             self.ping = Ping(self)
             if not self.is_connected():
-                self.logger.debug("ControlStack: Reconnecting...")
+                self.logger.debug("reconnecting...")
                 self.connect()
             if not self.is_connected() and not self.reconnect:
-                self.logger.debug("ControlStack: Connection rejected")
-                raise ConnectionRejectedError("Connection refused while connecting to Mumble server (Murmur)")
-            self.logger.debug(f"Connected: {self.is_connected()}")
+                self.logger.debug("connection rejected")
+                raise ConnectionRejectedError("connection refused while connecting to Mumble Server (Murmur)")
+            self.logger.debug(f"connected: {self.is_connected()}")
             if self.is_connected():
                 try:
-                    self.logger.debug("ControlStack: Listening...")
+                    self.logger.debug("listening...")
                     self.ping.start()
                     self._listen()
                     self.ping.cancel()
                     self._ready.acquire(True)
                 except socket_error as e:
                     self.logger.error(
-                        f"ControlStack: Exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
+                        f"exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
                     self.status = Status.FAILED
             self._on_disconnect()
             sleep(CONNECTION_RETRY_INTERVAL)
         try:
             self.socket.close()
         except socket_error:
-            self.logger.debug("ControlStack: Trying to close already close socket!")
+            self.logger.debug("trying to close already close socket!")
 
     def disconnect(self):
         try:
             self._ready.release()
         except RuntimeError:
-            self.logger.debug("ControlStack: ready lock already released")
+            self.logger.debug("ready lock already released")
         self._disconnect = True
         if self.thread.is_alive():
             self.thread.join(timeout=10)
-        self.logger.debug("ControlSocket: disconnected")
+        self.logger.debug("disconnected")
 
     def set_application_string(self, string):
         self.version_string = string
@@ -292,17 +292,17 @@ class ControlStack:
         self._voice_dispatcher(data)
 
     def ready(self):
-        self.logger.debug("ControlStack: releasing ready lock")
+        self.logger.debug("releasing ready lock")
         try:
             self._ready.release()
         except RuntimeError:
             pass
 
     def is_ready(self):
-        self.logger.debug("ControlStack: checking if ready")
+        self.logger.debug("checking if ready")
         self._ready.acquire(True)
         self._ready.release()
-        self.logger.debug("ControlStack: ready released")
+        self.logger.debug("ready released")
 
     def __del__(self):
         self.disconnect()

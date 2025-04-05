@@ -52,6 +52,7 @@ class CallbackDict(TypedDict, total=False):
 class Callbacks:
     def __init__(self, client: Mumble):
         self._client = client
+        self._logger = client.logger.getChild(self.__class__.__name__)
         self._temp = CallbackDict()
         self._callbacks = CallbackDict()
         self._pool = ThreadPool()
@@ -65,7 +66,7 @@ class Callbacks:
         except TypeError:
             pass
         except Exception:
-            self._client.logger.error("Error while executing callback", exc_info=True)
+            self._logger.error("Error while executing callback", exc_info=True)
 
     def disable(self):
         self._callbacks = {}

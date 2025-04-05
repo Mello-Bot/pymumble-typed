@@ -18,6 +18,8 @@ class VoiceOutput:
 
         self._control = control
         self._voice = voice
+        self._logger = voice.logger.getChild(self.__class__.__name__)
+        self._logger = control.logger.getChild(self.__class__.__name__)
 
         self._sequence_start_time = 0
         self._sequence_last_time = 0
@@ -80,7 +82,7 @@ class VoiceOutput:
         if delay >= 0:
             sleep(delay)
         else:
-            self._control.logger.warning(f"VoiceOutput::send_audio: delay is negative: {delay}!")
+            self._logger.warning(f"delay is negative: {delay}!")
 
     @property
     def encoder(self):

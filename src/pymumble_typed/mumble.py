@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from enum import IntEnum
-from logging import Logger, ERROR, DEBUG, StreamHandler
+from logging import Logger, ERROR, DEBUG, StreamHandler, Formatter
 from threading import current_thread
 
 from typing import TypedDict
@@ -45,10 +45,14 @@ class Mumble:
         self._ready = False
         self._debug = debug
         self._parent_thread = current_thread()
-        self._logger = logger if logger else Logger("PyMumble-Typed")
+        formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
+        handler = StreamHandler()
+        handler.setFormatter(formatter)
+
+        self._logger = logger.getChild("PyMumble-Typed") if logger else Logger("PyMumble-Typed")
         self._logger.setLevel(DEBUG if debug else ERROR)
         if not logger:
-            self._logger.addHandler(StreamHandler())
+            self._logger.addHandler(handler)
         self._opus_profile = CodecProfile.Audio
         self._stereo = stereo
 
@@ -122,9 +126,9 @@ class Mumble:
         _type = packet[0]
         message = packet[1:]
         try:
-            self._logger.debug(f"Mumble: Received UDP packet type: {UdpMessageType(_type).name}")
+            self._logger.debug(f"received UDP packet type: {UdpMessageType(_type).name}")
         except ValueError:
-            self._logger.debug(f"Mumble: Received UDP packet type: {_type}")
+            self._logger.debug(f"received UDP packet type: {_type}")
         else:
             if _type == UdpMessageType.Audio and self.sound_receive:
                 packet = Audio()
@@ -135,7 +139,7 @@ class Mumble:
                 packet.ParseFromString(message)
                 if packet.max_bandwidth_per_user:
                     self._server_max_bandwidth = packet.max_bandwidth_per_user
-                    self._logger.debug(f"Mumble: updated server max bandwidth per client {self._server_max_bandwidth}")
+                    self._logger.debug(f"updated server max bandwidth per client {self._server_max_bandwidth}")
                 self._voice.ping_response(packet)
 
     def _dispatch_legacy_voice_message(self, packet: bytes):
@@ -150,9 +154,9 @@ class Mumble:
 
     def _dispatch_control_message(self, _type: int, message: bytes):
         try:
-            self._logger.debug(f"Mumble: Received TCP packet type: {MessageType(_type).name}")
+            self._logger.debug(f"received TCP packet type: {MessageType(_type).name}")
         except ValueError:
-            self._logger.debug(f"Mumble: Received TCP packet type: {_type}")
+            self._logger.debug(f"received TCP packet type: {_type}")
         if _type == MessageType.UDPTunnel and self.sound_receive:
             if self._control.server_version < (1, 5, 0):
                 self._dispatch_legacy_voice_message(message)
@@ -171,13 +175,13 @@ class Mumble:
         match msg_type:
             case MessageType.Version:
                 self._control.set_version(packet)
-                self._logger.debug(f"Mumble: Received version: {packet.version_v1}")
+                self._logger.debug(f"received version: {packet.version_v1}")
                 if self._control.server_version < (1, 5, 0):
                     self._voice.set_voice_message_dispatcher(self._dispatch_legacy_voice_message)
                 else:
                     self._voice.set_voice_message_dispatcher(self._dispatch_voice_message)
             case MessageType.Authenticate:
-                self._logger.debug(f"Mumble: Received authenticate. Session: {packet.session}")
+                self._logger.debug(f"received authenticate. Session: {packet.session}")
             case MessageType.Ping:
                 self._control.ping.receive(packet)
             case MessageType.Reject:
@@ -273,9 +277,9 @@ class Mumble:
                     self._callbacks.dispatch("on_sound_received", user, sound)
                     sequence.value += int(round(sound.duration / 100))
                 except CodecNotSupportedError:
-                    self._logger.error("Codec not supported", exc_info=True)
+                    self._logger.error("codec not supported", exc_info=True)
                 except KeyError:
-                    self._logger.error(f"Invalid user session {session.value}")
+                    self._logger.error(f"invalid user session {session.value}")
             pos += size
 
     def _sound_received(self, packet: Audio):
