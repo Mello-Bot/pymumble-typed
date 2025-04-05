@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
+from queue import Queue
 from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
 from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLError
 from struct import pack, unpack
@@ -49,7 +50,8 @@ class ControlStack:
         self._disconnect = False
         self.reconnect = False
         self._on_disconnect: Callable[[], None] = lambda: None
-
+        self.msg_queue: Queue[Command] = Queue(maxsize=20)
+        self.audio_queue: Queue[AudioData] = Queue(maxsize=20)
         self.receive_buffer: bytes = bytes()
         self._dispatch_control_message = lambda _, __: None
         self.thread = Thread(target=self.loop, name="ControlStack:Loop")
@@ -158,7 +160,14 @@ class ControlStack:
                     raise socket_error("ControlStack: Server socket error")
                 packet = packet[sent:]
             except SSLError:
+                self.logger.debug(
+                    f"ControlStack: an SSL error occurred while sending {_type.name}. Attempting to reconnect and resend the packet.")
                 self.status = Status.FAILED
+                # Attempt to resend the message on connection failed
+                cmd = Command()
+                cmd.type = _type
+                cmd.packet = message
+                self.msg_queue.put(cmd)
 
     def _read_control_messages(self):
         try:
@@ -187,17 +196,23 @@ class ControlStack:
 
     def send_command(self, cmd: Command):
         if cmd.packet:
+            self.msg_queue.put(cmd)
             self.send_message(cmd.type, cmd.packet)
-            cmd.response = True
 
     def send_audio_legacy(self, audio: AudioData):
         tcp_packet = audio.legacy_tcp_packet
         while len(tcp_packet) > 0:
-            sent = self.socket.send(tcp_packet)
-            self.logger.debug(f"ControlStack: audio sent {sent}")
-            if sent < 0:
-                raise socket_error("ControlStack: Server socket error while sending audio")
-            tcp_packet = tcp_packet[sent:]
+            try:
+                sent = self.socket.send(tcp_packet)
+                self.logger.debug(f"ControlStack: audio sent {sent}")
+                if sent < 0:
+                    self.logger.error("ControlStack: Server socket error")
+                    self.status = Status.FAILED
+                    return
+                tcp_packet = tcp_packet[sent:]
+            except SSLError:
+                self.status = Status.FAILED
+                return
 
     def send_audio(self, audio: AudioData):
         self.logger.debug(f"ControlStack: sending audio protobuf")
@@ -209,6 +224,12 @@ class ControlStack:
         while self.status != Status.NOT_CONNECTED and self.status != Status.FAILED and not self._disconnect:
             if not parent_thread.is_alive():
                 self.disconnect()
+            for cmd in self.msg_queue.queue:
+                self.send_message(cmd.type, cmd.packet)
+                # FIXME: mark as responded when a response is actually received
+                cmd.response = True
+            for audio in self.audio_queue.queue:
+                self._voice_dispatcher(audio)
             self._read_control_messages()
         self._ready.release()
         self.logger.debug(f"ControlStack: Exiting. Status: {self.status} Exit: {exit_}")
@@ -216,7 +237,8 @@ class ControlStack:
     def loop(self):
         self.logger.debug("ControlStack: Entering loop")
         self.logger.debug(self.status)
-        while (self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
+        while (
+                self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
             self.ping = Ping(self)
             if not self.is_connected():
                 self.logger.debug("ControlStack: Reconnecting...")
