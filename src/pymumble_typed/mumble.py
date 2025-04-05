@@ -21,6 +21,7 @@ from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError
 from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
+from pymumble_typed.network.ping import Ping
 
 
 class ClientType(IntEnum):
@@ -65,11 +66,15 @@ class Mumble:
         self.channels: Channels = Channels(self)
         self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
                                  server_max_image_message_length=131072)
-        self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, client_type,
+        self._ping: Ping = Ping()
+        self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, self._ping, client_type,
                                                    self._logger)
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
+        self._ping.set_voice(self._voice)
+        self._ping.set_control(self._control)
         self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
+
 
     @property
     def sound_output(self):
@@ -121,6 +126,9 @@ class Mumble:
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self.voice = VoiceOutput(self._control, self._voice)
+        self._ping.set_control(self._control)
+        self._ping.set_voice(self._voice)
+        self._ping.reset()
 
     def _dispatch_voice_message(self, packet: bytes):
         _type = packet[0]
@@ -183,7 +191,7 @@ class Mumble:
             case MessageType.Authenticate:
                 self._logger.debug(f"received authenticate. Session: {packet.session}")
             case MessageType.Ping:
-                self._control.ping.receive(packet)
+                self._control.ping.tcp.update()
             case MessageType.Reject:
                 self._control.status = Status.FAILED
                 self._control.ready()
@@ -221,7 +229,6 @@ class Mumble:
                 pass
             case MessageType.CryptSetup:
                 self._voice.crypt_setup(packet)
-                self._voice.ping()
             case MessageType.ContextActionModify:
                 # FIXME: CALLBACK ContextActionModify
                 self._callbacks.dispatch("on_context_action")

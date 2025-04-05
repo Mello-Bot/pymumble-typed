@@ -3,64 +3,111 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.network.control import ControlStack, Status
+    from pymumble_typed.network.control import ControlStack
+    from pymumble_typed.network.voice import VoiceStack
 
 from threading import Timer
 from time import time
+from math import sqrt
 
 from pymumble_typed import MessageType
 from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket
 
 
-class Ping(Timer):
-    DELAY = 10
-
-    def __init__(self, control: ControlStack):
-        super().__init__(Ping.DELAY, self.send)
-        self.last_receive = 0.
-        self.time_send = 0.
-        self.number = 1
-        self.average = 0.
-        self.variance = 0.
-        self.udp_packets: int = 0
-        self.udp_ping_average: float = 0.
-        self.udp_ping_variance: float = 0.
-        self.udp_good: int = 0
-        self.udp_late: int = 0
-        self.udp_lost: int = 0
-        self.last = 0
-        self._control = control
-
+class RepeatTimer(Timer):
     def run(self):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
 
+
+class PingStats:
+    def __init__(self):
+        self.number: int = 0
+
+        self.average: float = 0.
+        self.average_square: float = 0.
+        self.variance: float = 0.
+        self.time_send = time()
+        self.last_received: float = 0.
+
     def send(self):
+        self.time_send = time()
+
+    def update(self, ping: float | None = None):
+        self.last_received = time()
+        ping = ping or (self.last_received - self.time_send) * 1000
+        self.average = ((self.average * self.number) + ping) / (self.number + 1)
+        self.average_square = ((self.average_square * self.number) + (ping * ping)) / (self.number + 1)
+        self.variance = sqrt(self.average_square - (self.average * self.average))
+        self.number += 1
+
+
+class Ping:
+    DELAY = 10
+
+    def __init__(self):
+        self.tcp = PingStats()
+        self.udp = PingStats()
+        self._control: ControlStack | None = None
+        self._voice: VoiceStack | None = None
+        self._timer = RepeatTimer(Ping.DELAY, self.send)
+
+    def set_voice(self, voice: VoiceStack):
+        self._voice = voice
+
+    def set_control(self, control: ControlStack):
+        self._control = control
+
+    def start(self):
+        if not self._control or not self._voice:
+            raise Exception(f"Cannot start ping timer. ControlStack = {self._control}, VoiceStack = {self._voice}")
+        self._timer.start()
+
+    def cancel(self):
+        self._timer.cancel()
+        self.reset()
+
+    def reset(self):
+        self.tcp = PingStats()
+        self.udp = PingStats()
+        if not self._timer.cancel():
+            self._timer.cancel()
+        self._timer = RepeatTimer(Ping.DELAY, self.send)
+
+    def send(self):
+        if not self._control.is_connected():
+            return
         packet = PingPacket()
         packet.timestamp = int(time())
-        packet.tcp_ping_avg = self.average
-        packet.tcp_ping_var = self.variance
-        packet.tcp_packets = self.number
-        packet.udp_packets = self.udp_packets
-        packet.udp_ping_avg = self.udp_ping_average
-        packet.udp_ping_var = self.udp_ping_variance
-        packet.good = self.udp_good
-        packet.late = self.udp_late
-        packet.lost = self.udp_lost
-        self.time_send = int(time() * 1000)
-        self.last = time()
-        self._control.send_message(MessageType.Ping, packet)
-        if self.last_receive != 0 and time() > self.last_receive + 60:
-            self._control.status = Status.NOT_CONNECTED
-        return True
+        packet.tcp_ping_avg = self.tcp.average
+        packet.tcp_ping_var = self.tcp.variance
+        packet.tcp_packets = self.tcp.number
+        packet.udp_packets = self.udp.number
+        packet.udp_ping_avg = self.udp.average
+        packet.udp_ping_var = self.udp.variance
+        packet.good = self._voice.ocb.ui_good
+        packet.late = self._voice.ocb.ui_late
+        packet.lost = self._voice.ocb.ui_lost
 
-    def receive(self, _: PingPacket):
-        self.last_receive = int(time() * 1000)
-        ping = self.last_receive - self.time_send
-        old_average = self.average
-        number = self.number
-        new_average = ((self.average * number) + ping) / (self.number + 1)
-        self.variance = self.variance + pow(old_average - new_average, 2) + (1 / self.number) * pow(ping - new_average,
-                                                                                                    2)
-        self.average = new_average
-        self.number += 1
+        # Send a TCP ping
+        self.tcp.send()
+        self._control.send_message(MessageType.Ping, packet)
+
+
+        # Send a UDP ping to check connection
+        if self._voice.check_connection:
+            self.udp.send()
+            self._voice.ping(True, False)
+
+
+        if self._voice.check_connection and time() - self._voice.last_good_ping > 15:
+            self._voice.active = False
+            self._voice.signal_protocol_change()
+
+        # If no TCP ping has been received for over 60 seconds, then connection is lost
+        if (self.tcp.time_send != 0 and
+                time() - self.tcp.time_send > 60000 and
+                time() > self.tcp.last_received + 60):
+            self._control.timeout()
+            return
+        return

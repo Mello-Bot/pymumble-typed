@@ -34,7 +34,7 @@ class Status(IntEnum):
 
 class ControlStack:
     def __init__(self, host: str, port: int, user: str, password: str | None, tokens: list[str], cert_file: str,
-                 key_file: str, client_type: ClientType, logger: Logger):
+                 key_file: str, ping: Ping, client_type: ClientType, logger: Logger):
         self.socket: SSLSocket | None = None
         self.user = user
         self.password = password
@@ -60,12 +60,12 @@ class ControlStack:
         self._ready.acquire(True)
         self._server_version = (0, 0, 0)
         self._voice_dispatcher: Callable[[AudioData], None] = self.send_audio_legacy
-        self.ping: Ping = Ping(self)
+        self.ping = ping
 
     def reinit(self) -> ControlStack:
         self.disconnect()
         return ControlStack(self.host, self.port, self.user, self.password, self.tokens, self.cert_file, self.key_file,
-                            self.client_type, self.logger)
+                            self.ping, self.client_type, self.logger)
 
     def set_version_string(self, version_string: str):
         self.version_string = version_string
@@ -231,15 +231,21 @@ class ControlStack:
             for audio in self.audio_queue.queue:
                 self._voice_dispatcher(audio)
             self._read_control_messages()
-        self._ready.release()
+        try:
+            self._ready.release()
+        except RuntimeError:
+            pass
         self.logger.debug(f"exiting. Status: {self.status} Exit: {exit_}")
+
+    def timeout(self):
+        self.status = Status.FAILED
 
     def loop(self):
         self.logger.debug("entering loop")
         self.logger.debug(self.status)
         while (
                 self.status == Status.NOT_CONNECTED or self.status == Status.AUTHENTICATING or self.reconnect) and not self._disconnect:
-            self.ping = Ping(self)
+            self.ping.reset()
             if not self.is_connected():
                 self.logger.debug("reconnecting...")
                 self.connect()
