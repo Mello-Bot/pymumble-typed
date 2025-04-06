@@ -68,7 +68,7 @@ class VoiceOutput:
         self._update_sequence()
         audio = AudioData()
         audio_encoded = 0
-        while not self._buffer.empty() and audio_encoded < audio_per_packet:
+        while self._buffer.qsize() > 0 and audio_encoded < audio_per_packet:
             pcm = self._buffer.get(block=False)
             encoded = self._encoder.encode(pcm)
             audio.add_chunk(encoded)
