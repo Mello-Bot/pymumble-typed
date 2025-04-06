@@ -268,8 +268,8 @@ class ControlStack:
                 try:
                     self.logger.debug("listening...")
                     self.ping.start()
-                    listen_thread = Thread(target=self._listen)
-                    send_thread = Thread(target=self._send)
+                    listen_thread = Thread(target=self._listen, name="Control:Listen")
+                    send_thread = Thread(target=self._send, name="Control:Send")
                     listen_thread.start()
                     send_thread.start()
                     listen_thread.join()
