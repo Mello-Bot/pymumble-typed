@@ -28,6 +28,7 @@ class User:
         self.deaf = packet.deaf
         self.self_deaf = packet.self_deaf
         self.suppressed = packet.suppress
+        self.is_recording = packet.recording
         self._texture_hash = packet.texture_hash
         self._comment_hash = packet.comment_hash
         self.comment: str = ""
