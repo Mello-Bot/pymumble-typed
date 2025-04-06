@@ -16,11 +16,14 @@ from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 
 class Command:
     def __init__(self):
-        self.id = 0
         self.type: MessageType = MessageType.Ping
-        self.response = False
         self.packet: Message | None = None
 
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return f"Command({self.type})"
 
 class Move(Command):
     def __init__(self, session: int, channel_id: int):

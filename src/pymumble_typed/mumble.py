@@ -317,8 +317,7 @@ class Mumble:
     def execute_command(self, cmd: Command, blocking: bool = True):
         if blocking:
             self.is_ready()
-        self._control.send_message(cmd.type, cmd.packet)
-        return None
+        self._control.send_command(cmd)
 
     def get_max_message_length(self) -> int:
         return self.settings["server_max_message_length"]

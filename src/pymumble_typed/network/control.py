@@ -50,7 +50,7 @@ class ControlStack:
         self._disconnect = False
         self.reconnect = False
         self._on_disconnect: Callable[[], None] = lambda: None
-        self.msg_queue: Queue[Command] = Queue(maxsize=20)
+        self.msg_queue: Queue[Command | AudioData] = Queue(maxsize=20)
         self.audio_queue: Queue[AudioData] = Queue(maxsize=20)
         self.receive_buffer: bytes = bytes()
         self._dispatch_control_message = lambda _, __: None
@@ -197,7 +197,6 @@ class ControlStack:
     def send_command(self, cmd: Command):
         if cmd.packet:
             self.msg_queue.put(cmd)
-            self.send_message(cmd.type, cmd.packet)
 
     def send_audio_legacy(self, audio: AudioData):
         tcp_packet = audio.legacy_tcp_packet
@@ -221,21 +220,33 @@ class ControlStack:
     def _listen(self):
         exit_ = False
         parent_thread = current_thread()
-        while self.status != Status.NOT_CONNECTED and self.status != Status.FAILED and not self._disconnect:
+        while self.is_connected() and not self._disconnect:
             if not parent_thread.is_alive():
                 self.disconnect()
-            for cmd in self.msg_queue.queue:
-                self.send_message(cmd.type, cmd.packet)
-                # FIXME: mark as responded when a response is actually received
-                cmd.response = True
-            for audio in self.audio_queue.queue:
-                self._voice_dispatcher(audio)
             self._read_control_messages()
         try:
             self._ready.release()
         except RuntimeError:
             pass
-        self.logger.debug(f"exiting. Status: {self.status} Exit: {exit_}")
+        self.logger.debug(f"exiting listen loop. Status: {self.status} Exit: {exit_}")
+
+    def _send(self):
+        exit_ = False
+        parent_thread = current_thread()
+        while self.is_connected() and not self._disconnect:
+            if not parent_thread.is_alive():
+                self.disconnect()
+            something =  self.msg_queue.get()
+            if type(something) is AudioData:
+                self._voice_dispatcher(something)
+            else:
+                self.send_message(something.type, something.packet)
+        try:
+            self._ready.release()
+        except RuntimeError:
+            pass
+        self.logger.debug(f"exiting send loop. Status: {self.status} Exit: {exit_}")
+
 
     def timeout(self):
         self.status = Status.FAILED
@@ -257,7 +268,12 @@ class ControlStack:
                 try:
                     self.logger.debug("listening...")
                     self.ping.start()
-                    self._listen()
+                    listen_thread = Thread(target=self._listen)
+                    send_thread = Thread(target=self._send)
+                    listen_thread.start()
+                    send_thread.start()
+                    listen_thread.join()
+                    send_thread.join()
                     self.ping.cancel()
                     self._ready.acquire(True)
                 except socket_error as e:
@@ -295,7 +311,7 @@ class ControlStack:
         self.send_message(MessageType.Authenticate, packet)
 
     def enqueue_audio(self, data: AudioData):
-        self._voice_dispatcher(data)
+        self.msg_queue.put(data)
 
     def ready(self):
         self.logger.debug("releasing ready lock")
