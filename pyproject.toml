@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pymumble-typed"
-version = "4.0.5"
+version = "4.0.6"
 dependencies = [
     "pycryptodomex==3.22.0",
     "opuslib==3.0.1",
@@ -12,11 +12,11 @@ dependencies = [
 ]
 requires-python = ">= 3.11"
 authors = [
-    {name="nico9889", email="contact@nico9889.me"}
+    { name = "nico9889", email = "contact@nico9889.me" }
 ]
-description="A Python implementation of the Mumble protocol, useful to make bots or clients"
+description = "A Python implementation of the Mumble protocol, useful to make bots or clients"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 keywords = ["mumble"]
 classifiers = [
     # How mature is this project? Common values are
@@ -24,14 +24,11 @@ classifiers = [
     #   4 - Beta
     #   5 - Production/Stable
     "Development Status :: 4 - Beta",
-
     # Indicate who your project is intended for
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
-
     # Pick your license as you wish (see also "license" above)
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-
     # Specify the Python versions you support here.
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -46,6 +43,6 @@ Issues = "https://github.com/Mello-Bot/pymumble-typed/issues"
 
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools==1.71.0",
+    "grpcio-tools==1.72.0rc1",
     "types-protobuf==5.29.1.20250403"
 ]
