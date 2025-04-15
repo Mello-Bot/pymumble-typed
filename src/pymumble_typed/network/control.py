@@ -65,7 +65,7 @@ class ControlStack:
     def reinit(self) -> ControlStack:
         self.disconnect()
         return ControlStack(self.host, self.port, self.user, self.password, self.tokens, self.cert_file, self.key_file,
-                            self.ping, self.client_type, self.logger)
+                            self.ping, self.client_type, self.logger.parent)
 
     def set_version_string(self, version_string: str):
         self.version_string = version_string
