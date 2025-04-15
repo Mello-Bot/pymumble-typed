@@ -3,21 +3,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pymumble_typed.blobs import BlobDB
     from pymumble_typed.channels import Channel
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.protobuf.Mumble_pb2 import UserState, UserRemove
-from struct import unpack
+
 from threading import Lock
 
 from pymumble_typed.sound.soundqueue import LegacySoundQueue
-from pymumble_typed.protobuf.Mumble_pb2 import RequestBlob
-from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser
+from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser, RequestBlobCmd
 
 
 class User:
-    def __init__(self, mumble: Mumble, packet: UserState):
-        self.sound = LegacySoundQueue(lambda sound: mumble.callbacks.dispatch("on_sound_received", self, sound), mumble.logger)
+    def __init__(self, mumble: Mumble, blob: BlobDB, packet: UserState):
+        self.sound = LegacySoundQueue(lambda sound: mumble.callbacks.dispatch("on_sound_received", self, sound),
+                                      mumble.logger)
         self._mumble: Mumble = mumble
+        self._blob = blob
         self.hash: str = packet.hash
         self.session: int = packet.session
         self.name = packet.name
@@ -29,13 +31,55 @@ class User:
         self.self_deaf = packet.self_deaf
         self.suppressed = packet.suppress
         self.is_recording = packet.recording
-        self._texture_hash = packet.texture_hash
+
         self._comment_hash = packet.comment_hash
-        self.comment: str = ""
-        self.texture: str = ""
-        self._update_comment()
-        self._update_texture()
+        self.comment = packet.comment
+        if not (packet.HasField("comment") or packet.HasField("comment_hash")):
+            self._blob.update_user_comment(self.hash, "", "")
+        elif self._blob.is_user_comment_updated(self.hash, self._comment_hash.hex()):
+            self.comment = self._blob.get_user_comment(self.hash)
+
+        self._texture_hash = packet.texture_hash
+        self.texture = packet.texture
+        if not (packet.HasField("texture") or packet.HasField("texture_hash")):
+            self._blob.update_user_comment(self.hash, "", "")
+        elif self._blob.is_user_texture_updated(self.hash, self._texture_hash.hex()):
+            self.texture = self._blob.get_user_texture(self.hash)
         self._users = self._mumble.users
+        if self._mumble.ready:
+            self.request_comment()
+            self.request_texture()
+
+    @property
+    def avatar(self):
+        return self.texture
+
+    def needs_update(self):
+        return not (self.is_comment_updated() and self.is_avatar_updated())
+
+    def is_comment_updated(self):
+        return ((not self.comment) == (not self._comment_hash)) or self._blob.is_user_comment_updated(self.hash,
+                                                                                                      self._comment_hash.hex())
+
+    def is_avatar_updated(self):
+        return ((not self.texture) == (not self._texture_hash)) or self._blob.is_user_texture_updated(self.hash,
+                                                                                                      self._texture_hash.hex())
+
+    def request_comment(self):
+        if not self._comment_hash:
+            return
+        if self._mumble.blob_greedy_update and not self.is_comment_updated():
+            self._update_comment()
+        else:
+            self.comment = self._blob.get_user_comment(self.hash)
+
+    def request_texture(self):
+        if not self._texture_hash:
+            return
+        if self._mumble.blob_greedy_update and not self.is_avatar_updated():
+            self._update_texture()
+        else:
+            self.texture = self._blob.get_user_texture(self.hash)
 
     def myself(self):
         return self._users.myself.session == self.session
@@ -66,17 +110,32 @@ class User:
         if packet.HasField("suppress") and self.suppressed != packet.suppress:
             actions["suppress"] = self.suppressed
             self.suppressed = packet.suppress
-
         if packet.HasField("comment_hash"):
-            if packet.HasField("comment"):
-                self.comment = packet.comment
-            else:
-                self._update_comment()
+            self._comment_hash = packet.comment_hash
+            self.request_comment()
+            return None
+        if packet.HasField("comment"):
+            actions["comment"] = self.comment
+            self.comment = packet.comment
+            if not self.comment:
+                self._comment_hash = b''
+                self._blob.update_user_comment(self.hash, self._comment_hash.hex(), self.comment)
+            if self._comment_hash:
+                self._blob.update_user_comment(self.hash, self._comment_hash.hex(), self.comment)
         if packet.HasField("texture_hash"):
-            if packet.HasField("texture"):
-                self.texture = packet.texture
-            else:
-                self._update_texture()
+            self._texture_hash = packet.texture_hash
+            self.request_texture()
+            return None
+        if packet.HasField("texture"):
+            actions["texture"] = self.texture
+            actions["avatar"] = self.texture
+            self.texture = packet.texture
+            if not self.texture:
+                self._texture_hash = b''
+                self._blob.update_user_texture(self.hash, self._texture_hash.hex(), self.texture)
+            if self._texture_hash:
+                self._blob.update_user_texture(self.hash, self._texture_hash.hex(), self.texture)
+
         return actions
 
     def channel(self):
@@ -85,16 +144,14 @@ class User:
     def _update_comment(self):
         if not self._comment_hash:
             return
-        packet = RequestBlob()
-        packet.session_comment.extend(unpack("!5I", self._comment_hash))
-        self._mumble.request_blob(packet)
+        cmd = RequestBlobCmd(user_comment_hashes=[self.session])
+        self._mumble.execute_command(cmd, False)
 
     def _update_texture(self):
         if not self._texture_hash:
             return
-        packet = RequestBlob()
-        packet.session_texture.extend(unpack("!5I", self._texture_hash))
-        self._mumble.request_blob(packet)
+        cmd = RequestBlobCmd(user_texture_hashes=[self.session])
+        self._mumble.execute_command(cmd, False)
 
     def mute(self, myself: bool = False, action: bool = True):
         if self.myself() and myself:
@@ -198,42 +255,47 @@ class User:
 
 
 class Users(dict[int, User]):
-    def __init__(self, mumble: Mumble):
+    def __init__(self, mumble: Mumble, blob: BlobDB):
         super().__init__()
         self.myself: User | None = None
         self._mumble = mumble
+        self._blob = blob
         self._myself_session = None
         self._lock = Lock()
+        self._logger = mumble.logger.getChild(self.__class__.__name__)
 
     def handle_update(self, packet: UserState):
-        self._lock.acquire()
-        try:
-            user = self[packet.session]
-            actor = self[packet.actor]
-            before = user.update(packet)
-            self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
-        except KeyError:
-            user = User(self._mumble, packet)
-            self[packet.session] = user
-            if packet.session != self._myself_session:
-                self._mumble.callbacks.dispatch("on_user_created", user)
-            else:
-                self.myself = user
-        self._lock.release()
+        with self._lock:
+            try:
+                user = self[packet.session]
+                # FIXME: packet.session should be removed and a null actor passed.
+                #  It's currently reported back as a self-update to avoid breaking changes
+                actor = self[packet.actor or packet.session]
+                before = user.update(packet)
+                # Avoid calling callback if no modification has been registered (like for hashes)
+                if self._mumble.blob_greedy_update and not before:
+                    return
+                self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
+            except KeyError:
+                user = User(self._mumble, self._blob, packet)
+                self[packet.session] = user
+                if packet.session != self._myself_session:
+                    self._mumble.callbacks.dispatch("on_user_created", user)
+                else:
+                    self.myself = user
 
     def remove(self, packet: UserRemove):
-        self._lock.acquire()
-        try:
-            user = self[packet.session]
+        with self._lock:
             try:
-                actor = self[packet.actor]
+                user = self[packet.session]
+                try:
+                    actor = self[packet.actor]
+                except KeyError:
+                    actor = user
+                del self[packet.session]
+                self._mumble.callbacks.dispatch("on_user_removed", user, actor, packet.ban, packet.reason)
             except KeyError:
-                actor = user
-            del self[packet.session]
-            self._mumble.callbacks.dispatch("on_user_removed", user, actor, packet.ban, packet.reason)
-        except KeyError:
-            pass
-        self._lock.release()
+                self._logger.warning(f"cannot remove user {packet.session}: user do not exist")
 
     def set_myself(self, session: int):
         self._myself_session = session

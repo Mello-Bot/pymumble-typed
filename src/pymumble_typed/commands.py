@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from pymumble_typed import MessageType
 
 from pymumble_typed.protobuf.Mumble_pb2 import UserState, TextMessage as TextMessagePacket, ChannelState, \
-    ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL
+    ChannelRemove, VoiceTarget as VoiceTargetPacket, UserRemove, ACL, RequestBlob
 
 from pymumble_typed.messages import ImageTooBigError, TextTooLongError
 
@@ -219,7 +219,7 @@ class ChannelACL:
 
 
 class UpdateACL(Command):
-    def __init__(self, channel_id: int, inherit_acls, chan_group: list[ChannelGroup], chan_acl: list[ChannelACL]):
+    def __init__(self, channel_id: int, inherit_acls: bool, chan_group: list[ChannelGroup], chan_acl: list[ChannelACL]):
         super().__init__()
         self.type = MessageType.ACL
         self.packet = ACL()
@@ -257,3 +257,12 @@ class UpdateACL(Command):
             if not chan_acl.inherited:
                 self.packet.acls.append(chan_acl)
         self.packet.query = False
+
+class RequestBlobCmd(Command):
+    def __init__(self, user_comment_hashes: list[int] | None = None, user_texture_hashes: list[int] | None = None, channel_comment_hashes: list[int] | None = None ):
+        super().__init__()
+        self.type = MessageType.RequestBlob
+        self.packet = RequestBlob()
+        self.packet.session_comment.extend(user_comment_hashes or [])
+        self.packet.session_texture.extend(user_texture_hashes or [])
+        self.packet.channel_description.extend(channel_comment_hashes or [])

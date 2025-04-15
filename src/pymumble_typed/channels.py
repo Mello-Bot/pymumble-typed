@@ -3,37 +3,47 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.protobuf.Mumble_pb2 import ChannelState, RequestBlob
+    from pymumble_typed.blobs import BlobDB
+    from pymumble_typed.protobuf.Mumble_pb2 import ChannelState
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.users import User
-
-from struct import unpack
-
 from pymumble_typed.acl import ACL
 from pymumble_typed.commands import CreateChannel, RemoveChannel, Move, TextMessage, LinkChannel, UnlinkChannel, \
-    UpdateChannel, QueryACL
-
-from pymumble_typed.protobuf.Mumble_pb2 import RequestBlob
+    UpdateChannel, QueryACL, RequestBlobCmd
 
 from threading import Lock
 
 
 class Channel:
-    def __init__(self, mumble: Mumble, packet: ChannelState):
+    def __init__(self, mumble: Mumble, blob: BlobDB, packet: ChannelState):
         self._mumble = mumble
+        self._blob = blob
         self.id: int = packet.channel_id
         self.acl: ACL = ACL(mumble, packet.channel_id)
         self.name: str = packet.name
         self._parent: int = packet.parent
+
+        self._description_hash = packet.description_hash
+        self.description = packet.description
+        if not (packet.HasField("description") or packet.HasField("description_hash")):
+            self._blob.update_channel_description(self.id, "", "")
+        elif self._blob.is_channel_description_updated(self.id, self._description_hash.hex()):
+            self.description = self._blob.get_channel_description(self.id)
+
         self._description_hash: bytes = packet.description_hash
-        self.description: str = ""
+        self.description: str = self._blob.get_channel_description(self.id)
         self.temporary: bool = packet.temporary
         self.position = packet.position
         self.max_users = packet.max_users
         self.can_enter = packet.can_enter
         self.is_enter_restricted = packet.is_enter_restricted
         self.links: list[int] = packet.links
-        self._get_description()
+        if self._mumble.ready:
+            self.request_description()
+
+    def needs_update(self):
+        return self._description_hash and not self._blob.is_channel_description_updated(self.id,
+                                                                                        self._description_hash.hex())
 
     def update(self, packet: ChannelState):
         actions = {}
@@ -67,18 +77,22 @@ class Channel:
             self.links = packet.links
         if packet.HasField("description_hash"):
             self._description_hash = packet.description_hash
-            if packet.HasField("description"):
-                self.description = packet.description
-            else:
-                self._get_description()
+            self.request_description()
+        if packet.HasField("description"):
+            actions["description"] = self.description
+            self.description = packet.description
+            if not self.description:
+                self._description_hash = b''
+                self._blob.update_channel_description(self.id, self._description_hash.hex(), self.description)
+            if self._description_hash:
+                self._blob.update_channel_description(self.id, self._description_hash.hex(), packet.description)
         return actions
 
-    def _get_description(self):
+    def request_description(self):
         if not self._description_hash:
             return
-        packet = RequestBlob()
-        packet.channel_description.extend(unpack("!5I", self._description_hash))
-        self._mumble.request_blob(packet)
+        cmd = RequestBlobCmd(channel_comment_hashes=[self.id])
+        self._mumble.execute_command(cmd, False)
 
     @property
     def parent(self) -> Channel | None:
@@ -154,36 +168,37 @@ class Channel:
 
 
 class Channels(dict[int, Channel]):
-    def __init__(self, mumble: Mumble):
+    def __init__(self, mumble: Mumble, blob: BlobDB):
         super().__init__()
         self._mumble = mumble
         self._lock = Lock()
+        self._blob = blob
+        self._logger = mumble.logger.getChild(self.__class__.__name__)
 
     def current(self):
         return self._mumble.users.myself.channel()
 
     def handle_update(self, packet: ChannelState):
-        self._lock.acquire()
-        try:
-            channel = self[packet.channel_id]
-            before = channel.update(packet)
-            self._mumble.callbacks.dispatch("on_channel_updated", channel, before)
-        except KeyError:
-            channel = Channel(self._mumble, packet)
-            self[packet.channel_id] = channel
-            self._mumble.callbacks.dispatch("on_channel_created", channel)
-        self._lock.release()
+        with self._lock:
+            try:
+                channel = self[packet.channel_id]
+                before = channel.update(packet)
+                if not before:
+                    return
+                self._mumble.callbacks.dispatch("on_channel_updated", channel, before)
+            except KeyError:
+                channel = Channel(self._mumble, self._blob, packet)
+                self[packet.channel_id] = channel
+                self._mumble.callbacks.dispatch("on_channel_created", channel)
 
     def remove(self, channel_id: int):
-        self._lock.acquire()
-
-        try:
-            channel = self[channel_id]
-            del self[channel_id]
-            self._mumble.callbacks.dispatch("on_channel_removed", channel)
-        except KeyError:
-            pass
-        self._lock.release()
+        with self._lock:
+            try:
+                channel = self[channel_id]
+                del self[channel_id]
+                self._mumble.callbacks.dispatch("on_channel_removed", channel)
+            except KeyError:
+                self._logger.warning(f"cannot remove channel {channel_id}: channel do not exist")
 
     def new_channel(self, parent_id: int, name: str, temporary: bool = False):
         command = CreateChannel(parent_id, name, temporary)

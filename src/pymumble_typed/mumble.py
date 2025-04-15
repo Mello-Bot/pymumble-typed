@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-import struct
-from enum import IntEnum
-from logging import Logger, ERROR, DEBUG, StreamHandler, Formatter
-from threading import current_thread
+from typing import TypedDict, TYPE_CHECKING
 
-from typing import TypedDict
+if TYPE_CHECKING:
+    from logging import Logger
+
+import struct
+import sys
+from enum import IntEnum
+from logging import getLogger, ERROR, DEBUG, StreamHandler, Formatter
+from threading import current_thread
 
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
-from pymumble_typed.commands import Command, VoiceTarget
+from pymumble_typed.commands import Command, VoiceTarget, RequestBlobCmd
 from pymumble_typed.messages import Message as MessageContainer
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
@@ -22,6 +26,7 @@ from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
 from pymumble_typed.network.ping import Ping
+from pymumble_typed.blobs import BlobDB
 
 
 class ClientType(IntEnum):
@@ -38,7 +43,9 @@ class Settings(TypedDict):
 class Mumble:
     def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str = None,
                  key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
-                 client_type: ClientType = ClientType.BOT, debug: bool = False, logger: Logger = None):
+                 client_type: ClientType = ClientType.BOT, db_path: str = ":memory:", blob_greedy_update: bool = False,
+                 debug: bool = False,
+                 logger: Logger = None):
         super().__init__()
         self._command_limit = 5
         if tokens is None:
@@ -47,13 +54,15 @@ class Mumble:
         self._debug = debug
         self._parent_thread = current_thread()
         formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
-        handler = StreamHandler()
+        handler = StreamHandler(stream=sys.stdout)
         handler.setFormatter(formatter)
 
-        self._logger = logger.getChild("PyMumble-Typed") if logger else Logger("PyMumble-Typed")
+        self._logger = logger.getChild("PyMumble-Typed") if logger else getLogger("PyMumble-Typed")
         self._logger.setLevel(DEBUG if debug else ERROR)
-        if not logger:
+        if not self._logger.handlers:
             self._logger.addHandler(handler)
+        self.blob_greedy_update = blob_greedy_update
+        self._blob = BlobDB(self._logger, db_path)
         self._opus_profile = CodecProfile.Audio
         self._stereo = stereo
 
@@ -62,19 +71,19 @@ class Mumble:
 
         self._bandwidth = BANDWIDTH
         self._server_max_bandwidth = 0
-        self.users: Users = Users(self)
-        self.channels: Channels = Channels(self)
+        self.users: Users = Users(self, self._blob)
+        self.channels: Channels = Channels(self, self._blob)
         self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
                                  server_max_image_message_length=131072)
         self._ping: Ping = Ping()
-        self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, self._ping, client_type,
+        self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, self._ping,
+                                                   client_type,
                                                    self._logger)
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self._ping.set_voice(self._voice)
         self._ping.set_control(self._control)
         self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
-
 
     @property
     def sound_output(self):
@@ -117,8 +126,8 @@ class Mumble:
 
         self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
                                  server_max_image_message_length=131072)
-        self.users = Users(self)
-        self.channels = Channels(self)
+        self.users = Users(self, self._blob)
+        self.channels = Channels(self, self._blob)
         if self._control:
             self._control.disconnect()
         self._control = self._control.reinit()
@@ -197,6 +206,20 @@ class Mumble:
                 self._control.ready()
                 raise ConnectionRejectedError(packet.reason)
             case MessageType.ServerSync:
+                if self.blob_greedy_update:
+                    user_comment_sessions = [user.session for user in self.users.values() if
+                                             not user.is_comment_updated()]
+                    user_texture_sessions = [user.session for user in self.users.values() if
+                                             not user.is_avatar_updated()]
+                    channel_ids = [channel.id for channel in self.channels.values() if channel.needs_update()]
+                    if user_comment_sessions or user_texture_sessions or channel_ids:
+                        self._logger.debug(
+                            f"requesting blob updates for UsersComment({user_comment_sessions}), "
+                            f"UsersTexture({user_texture_sessions}), Channels({channel_ids})")
+                        cmd = RequestBlobCmd(user_texture_hashes=user_texture_sessions,
+                                             user_comment_hashes=user_comment_sessions,
+                                             channel_comment_hashes=channel_ids)
+                        self.execute_command(cmd, False)
                 self._voice.sync()
                 self.users.set_myself(packet.session)
                 self.set_bandwidth(packet.max_bandwidth)
@@ -232,7 +255,7 @@ class Mumble:
             case MessageType.ContextActionModify:
                 # FIXME: CALLBACK ContextActionModify
                 self._callbacks.dispatch("on_context_action")
-            case MessageType.ContextAction | MessageType.UserList | MessageType.VoiceTarget | MessageType.PermissionQuery | MessageType.CodecVersion | MessageType.UserStats | MessageType.RequestBlob:
+            case MessageType.ContextAction | MessageType.UserList | MessageType.VoiceTarget | MessageType.PermissionQuery | MessageType.CodecVersion | MessageType.UserStats:
                 pass
             case MessageType.ServerConfig:
                 if packet.HasField("max_bandwidth"):
