@@ -12,10 +12,10 @@ from pymumble_typed.tools import VarInt
 
 if TYPE_CHECKING:
     from logging import Logger
-    from typing import Callable
+    from collections.abc import Callable
 
 from pymumble_typed.crypto.ocb2 import CryptStateOCB2
-from socket import socket, AF_INET, SOCK_DGRAM, timeout, gaierror
+from socket import socket, AF_INET, SOCK_DGRAM, gaierror
 
 from pymumble_typed.protobuf.Mumble_pb2 import CryptSetup
 from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
@@ -70,7 +70,7 @@ class VoiceStack:
         self.ping(True, False)
         try:
             response = self.socket.recv(2048)
-        except timeout:
+        except TimeoutError:
             self.logger.warning("couldn't initialize UDP connection. Falling back to TCP.")
             self.active = False
             self.signal_protocol_change()
@@ -108,7 +108,7 @@ class VoiceStack:
             self._crypt_lock.release()
             try:
                 self.socket.sendto(encrypted, self.addr)
-            except (gaierror, timeout):
+            except (gaierror, TimeoutError):
                 self.logger.error("Exception occurred while sending UDP packet", exc_info=True)
         elif not data.is_ping:
             self.control.enqueue_audio(data)

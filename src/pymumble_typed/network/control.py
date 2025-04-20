@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from google.protobuf.message import Message
     from logging import Logger
     from ssl import SSLSocket
-    from typing import Callable
+    from collections.abc import Callable
 
 
 class Status(IntEnum):
@@ -52,7 +52,7 @@ class ControlStack:
         self._on_disconnect: Callable[[], None] = lambda: None
         self.msg_queue: Queue[Command | AudioData] = Queue(maxsize=20)
         self.audio_queue: Queue[AudioData] = Queue(maxsize=20)
-        self.receive_buffer: bytes = bytes()
+        self.receive_buffer: bytes = b''
         self._dispatch_control_message = lambda _, __: None
         self.thread = Thread(target=self.loop, name="ControlStack:Loop")
 
@@ -101,7 +101,7 @@ class ControlStack:
         return self.status != Status.FAILED and self.status != Status.NOT_CONNECTED
 
     def connect(self):
-        self.receive_buffer = bytes()
+        self.receive_buffer = b''
         self._disconnect = False
         try:
             self.logger.debug("connecting to the server")

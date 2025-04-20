@@ -110,7 +110,7 @@ class BlobDB:
             self._logger.error("Failed to get user texture", exc_info=True)
         self._lock.release()
         if not result:
-            return bytes()
+            return b''
         return b64decode(result[0])
 
     def is_user_texture_updated(self, user_hash: str, texture_hash: str) -> bool:

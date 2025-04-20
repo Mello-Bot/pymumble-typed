@@ -12,7 +12,7 @@ class VoiceOutput:
     def __init__(self, control: ControlStack, voice: VoiceStack):
         self.positional = [0, 0, 0]
         self._buffer: Queue[bytes] = Queue()
-        self._remaining_sample: bytes = bytes()
+        self._remaining_sample: bytes = b''
         self._encoder: Encoder = Encoder(voice)
         self.target: int = 0
 
@@ -35,7 +35,7 @@ class VoiceOutput:
 
         if time() - self._sequence_last_time <= self._encoder.audio_per_packet:
             pcm = self._remaining_sample + pcm
-        self._remaining_sample = bytes()
+        self._remaining_sample = b''
 
         offset = len(pcm) // samples
         i = 0

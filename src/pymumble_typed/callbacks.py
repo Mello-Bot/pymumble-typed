@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from multiprocessing.pool import ThreadPool
-from typing import TYPE_CHECKING, Callable, TypedDict, Literal
+from typing import TYPE_CHECKING, TypedDict, Literal
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from typing import NotRequired
