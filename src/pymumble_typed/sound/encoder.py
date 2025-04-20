@@ -1,7 +1,6 @@
 from threading import Lock
 
 from opuslib import Encoder as OpusEncoder, OpusError
-
 from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.sound import AUDIO_PER_PACKET, SAMPLE_RATE, CodecProfile, BANDWIDTH, CHANNELS
 

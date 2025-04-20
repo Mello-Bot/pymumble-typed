@@ -4,7 +4,6 @@ from math import ceil
 from struct import pack, unpack
 from time import time
 
-
 from Cryptodome.Cipher import AES
 from Cryptodome.Random import get_random_bytes
 

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.network.control import ControlStack
 from pymumble_typed.network.udp_data import PingData, UDPData
-
 from pymumble_typed.tools import VarInt
 
 if TYPE_CHECKING:
