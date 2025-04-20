@@ -51,6 +51,18 @@ class User:
             self.request_texture()
 
     @property
+    def avatar_hash(self) -> bytes:
+        return self._texture_hash
+
+    @property
+    def texture_hash(self) -> bytes:
+        return self._texture_hash
+
+    @property
+    def comment_hash(self) -> bytes:
+        return self._comment_hash
+
+    @property
     def avatar(self):
         return self.texture
 

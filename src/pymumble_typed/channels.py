@@ -41,6 +41,10 @@ class Channel:
         if self._mumble.ready:
             self.request_description()
 
+    @property
+    def description_hash(self) -> bytes:
+        return self._description_hash
+
     def needs_update(self):
         return self._description_hash and not self._blob.is_channel_description_updated(self.id,
                                                                                         self._description_hash.hex())
