@@ -82,6 +82,7 @@ class Reject(_message.Message):
         ServerFull: _ClassVar[Reject.RejectType]
         NoCertificate: _ClassVar[Reject.RejectType]
         AuthenticatorFail: _ClassVar[Reject.RejectType]
+        NoNewConnections: _ClassVar[Reject.RejectType]
     None: Reject.RejectType
     WrongVersion: Reject.RejectType
     InvalidUsername: Reject.RejectType
@@ -91,6 +92,7 @@ class Reject(_message.Message):
     ServerFull: Reject.RejectType
     NoCertificate: Reject.RejectType
     AuthenticatorFail: Reject.RejectType
+    NoNewConnections: Reject.RejectType
     TYPE_FIELD_NUMBER: _ClassVar[int]
     REASON_FIELD_NUMBER: _ClassVar[int]
     type: Reject.RejectType
@@ -462,7 +464,7 @@ class CodecVersion(_message.Message):
     def __init__(self, alpha: _Optional[int] = ..., beta: _Optional[int] = ..., prefer_alpha: bool = ..., opus: bool = ...) -> None: ...
 
 class UserStats(_message.Message):
-    __slots__ = ("session", "stats_only", "certificates", "from_client", "from_server", "udp_packets", "tcp_packets", "udp_ping_avg", "udp_ping_var", "tcp_ping_avg", "tcp_ping_var", "version", "celt_versions", "address", "bandwidth", "onlinesecs", "idlesecs", "strong_certificate", "opus")
+    __slots__ = ("session", "stats_only", "certificates", "from_client", "from_server", "udp_packets", "tcp_packets", "udp_ping_avg", "udp_ping_var", "tcp_ping_avg", "tcp_ping_var", "version", "celt_versions", "address", "bandwidth", "onlinesecs", "idlesecs", "strong_certificate", "opus", "rolling_stats")
     class Stats(_message.Message):
         __slots__ = ("good", "late", "lost", "resync")
         GOOD_FIELD_NUMBER: _ClassVar[int]
@@ -474,6 +476,15 @@ class UserStats(_message.Message):
         lost: int
         resync: int
         def __init__(self, good: _Optional[int] = ..., late: _Optional[int] = ..., lost: _Optional[int] = ..., resync: _Optional[int] = ...) -> None: ...
+    class RollingStats(_message.Message):
+        __slots__ = ("time_window", "from_client", "from_server")
+        TIME_WINDOW_FIELD_NUMBER: _ClassVar[int]
+        FROM_CLIENT_FIELD_NUMBER: _ClassVar[int]
+        FROM_SERVER_FIELD_NUMBER: _ClassVar[int]
+        time_window: int
+        from_client: UserStats.Stats
+        from_server: UserStats.Stats
+        def __init__(self, time_window: _Optional[int] = ..., from_client: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., from_server: _Optional[_Union[UserStats.Stats, _Mapping]] = ...) -> None: ...
     SESSION_FIELD_NUMBER: _ClassVar[int]
     STATS_ONLY_FIELD_NUMBER: _ClassVar[int]
     CERTIFICATES_FIELD_NUMBER: _ClassVar[int]
@@ -493,6 +504,7 @@ class UserStats(_message.Message):
     IDLESECS_FIELD_NUMBER: _ClassVar[int]
     STRONG_CERTIFICATE_FIELD_NUMBER: _ClassVar[int]
     OPUS_FIELD_NUMBER: _ClassVar[int]
+    ROLLING_STATS_FIELD_NUMBER: _ClassVar[int]
     session: int
     stats_only: bool
     certificates: _containers.RepeatedScalarFieldContainer[bytes]
@@ -512,7 +524,8 @@ class UserStats(_message.Message):
     idlesecs: int
     strong_certificate: bool
     opus: bool
-    def __init__(self, session: _Optional[int] = ..., stats_only: bool = ..., certificates: _Optional[_Iterable[bytes]] = ..., from_client: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., from_server: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., udp_packets: _Optional[int] = ..., tcp_packets: _Optional[int] = ..., udp_ping_avg: _Optional[float] = ..., udp_ping_var: _Optional[float] = ..., tcp_ping_avg: _Optional[float] = ..., tcp_ping_var: _Optional[float] = ..., version: _Optional[_Union[Version, _Mapping]] = ..., celt_versions: _Optional[_Iterable[int]] = ..., address: _Optional[bytes] = ..., bandwidth: _Optional[int] = ..., onlinesecs: _Optional[int] = ..., idlesecs: _Optional[int] = ..., strong_certificate: bool = ..., opus: bool = ...) -> None: ...
+    rolling_stats: UserStats.RollingStats
+    def __init__(self, session: _Optional[int] = ..., stats_only: bool = ..., certificates: _Optional[_Iterable[bytes]] = ..., from_client: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., from_server: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., udp_packets: _Optional[int] = ..., tcp_packets: _Optional[int] = ..., udp_ping_avg: _Optional[float] = ..., udp_ping_var: _Optional[float] = ..., tcp_ping_avg: _Optional[float] = ..., tcp_ping_var: _Optional[float] = ..., version: _Optional[_Union[Version, _Mapping]] = ..., celt_versions: _Optional[_Iterable[int]] = ..., address: _Optional[bytes] = ..., bandwidth: _Optional[int] = ..., onlinesecs: _Optional[int] = ..., idlesecs: _Optional[int] = ..., strong_certificate: bool = ..., opus: bool = ..., rolling_stats: _Optional[_Union[UserStats.RollingStats, _Mapping]] = ...) -> None: ...
 
 class RequestBlob(_message.Message):
     __slots__ = ("session_texture", "session_comment", "channel_description")
