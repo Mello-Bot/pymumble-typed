@@ -64,16 +64,20 @@ class VoiceStack:
         for listener in self._protocol_switch_listeners:
             listener(self.active)
 
+    def _ping_timeout(self):
+        if not self.check_connection:
+            self.logger.warning("couldn't receive UDP packets. Falling back to TCP.")
+            self.active = False
+            self.signal_protocol_change()
+            self.check_connection = True
+
     def _sync(self):
         self.socket.settimeout(3)
         self.ping(True, False)
         try:
             response = self.socket.recv(2048)
         except TimeoutError:
-            self.logger.warning("couldn't initialize UDP connection. Falling back to TCP.")
-            self.active = False
-            self.signal_protocol_change()
-            self.check_connection = True
+            self._ping_timeout()
             return
         self._crypt_lock.acquire(True)
         decrypted = self.ocb.decrypt(response)
@@ -109,6 +113,8 @@ class VoiceStack:
                 self.socket.sendto(encrypted, self.addr)
             except (gaierror, TimeoutError):
                 self.logger.error("Exception occurred while sending UDP packet", exc_info=True)
+                if time() - self.control.ping.udp.last_received > 3:
+                    self._ping_timeout()
         elif not data.is_ping:
             self.control.enqueue_audio(data)
         else:
