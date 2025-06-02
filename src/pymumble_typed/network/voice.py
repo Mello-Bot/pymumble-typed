@@ -21,6 +21,8 @@ from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
 
 
 class VoiceStack:
+    TIMEOUT = 3
+
     def __init__(self, control: ControlStack, logger: Logger):
         self.exit = False
         self.addr = (control.host, control.port)
@@ -30,7 +32,8 @@ class VoiceStack:
         self.control = control
         self.active = False
         self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
-        self.check_connection = False
+        # FIXME: Why was this false before? And why is this needed? When does it should stop checking UDP?
+        self.check_connection = True
         self._crypt_lock = Lock()
         self._last_lost = 0
         self._protocol_switch_listeners: list[Callable[[bool], None]] = []
@@ -72,7 +75,7 @@ class VoiceStack:
             self.check_connection = True
 
     def _sync(self):
-        self.socket.settimeout(3)
+        self.socket.settimeout(self.TIMEOUT)
         self.ping(True, False)
         try:
             response = self.socket.recv(2048)

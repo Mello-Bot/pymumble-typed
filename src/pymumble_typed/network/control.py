@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from queue import Queue
+from queue import Queue, Empty
 from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
-from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLError
+from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLError, SSLEOFError
 from struct import pack, unpack
 from threading import Thread, current_thread, Lock
 from time import sleep
@@ -33,6 +33,9 @@ class Status(IntEnum):
 
 
 class ControlStack:
+    # This is twice the ping delay because it shouldn't timeout before receiving ping responses
+    TIMEOUT = Ping.DELAY * 2
+
     def __init__(self, host: str, port: int, user: str, password: str | None, tokens: list[str], cert_file: str,
                  key_file: str, ping: Ping, client_type: ClientType, logger: Logger):
         self.socket: SSLSocket | None = None
@@ -107,7 +110,7 @@ class ControlStack:
             self.logger.debug("connecting to the server")
             info = getaddrinfo(self.host, self.port, AF_UNSPEC, SOCK_STREAM)
             socket_ = socket(info[0][0], SOCK_STREAM)
-            socket_.settimeout(10)
+            socket_.settimeout(self.TIMEOUT)
         except socket_error as exc:
             self.status = Status.FAILED
             self.logger.error("failed to connect to the server", exc_info=True)
@@ -150,30 +153,45 @@ class ControlStack:
     def on_disconnect(self, func: Callable[[], None]):
         self._on_disconnect = func
 
+    def _tcp_failed(self, _type: MessageType = None, message: Message = None):
+        if _type:
+            self.logger.error(
+                f"an error occurred while sending {_type.name}. Attempting to reconnect and resend the packet.",
+                exc_info=True)
+        else:
+            self.logger.error(
+                f"an error occurred while sending a TCP Packet. Attempting to reconnect and resend the packet.",
+                exc_info=True)
+        self.status = Status.FAILED
+        if not _type or not message:
+            return
+        # Attempt to resend the message on connection failed
+        cmd = Command()
+        cmd.type = _type
+        cmd.packet = message
+        self.msg_queue.put(cmd)
+
     def send_message(self, _type: MessageType, message: Message):
         self.logger.debug(f"sending TCP {_type.name}")
         packet = pack("!HL", _type.value, message.ByteSize()) + message.SerializeToString()
-        while len(packet) > 0:
-            try:
+        try:
+            while len(packet) > 0:
                 sent = self.socket.send(packet)
-                if sent < 0:
-                    raise socket_error("server socket error")
-                packet = packet[sent:]
-            except SSLError:
-                self.logger.debug(
-                    f"an SSL error occurred while sending {_type.name}. Attempting to reconnect and resend the packet.")
-                self.status = Status.FAILED
-                # Attempt to resend the message on connection failed
-                cmd = Command()
-                cmd.type = _type
-                cmd.packet = message
-                self.msg_queue.put(cmd)
+                if sent > 0:
+                    packet = packet[sent:]
+                else:
+                    self._tcp_failed(_type, message)
+                    packet = bytes()
+        except (SSLError, TimeoutError):
+            self._tcp_failed(_type, message)
 
     def _read_control_messages(self):
         try:
             buffer: bytes = self.socket.recv(READ_BUFFER_SIZE)
             self.receive_buffer += buffer
-        except TimeoutError:
+        except (ConnectionResetError, TimeoutError, SSLEOFError):
+            self.logger.warning("Server terminated the connection", exc_info=True)
+            self.status = Status.FAILED
             return
         except socket_error:
             self.logger.error("error while reading control messages", exc_info=True)
@@ -203,11 +221,11 @@ class ControlStack:
         while len(tcp_packet) > 0:
             try:
                 sent = self.socket.send(tcp_packet)
-                self.logger.debug(f"audio sent {sent}")
-                if sent < 0:
-                    self.logger.error("server socket error")
-                    self.status = Status.FAILED
-                    return
+                if sent > 0:
+                    tcp_packet = tcp_packet[sent:]
+                else:
+                    self._tcp_failed()
+                    tcp_packet = bytes()
                 tcp_packet = tcp_packet[sent:]
             except SSLError:
                 self.status = Status.FAILED
@@ -236,17 +254,19 @@ class ControlStack:
         while self.is_connected() and not self._disconnect:
             if not parent_thread.is_alive():
                 self.disconnect()
-            something =  self.msg_queue.get()
-            if type(something) is AudioData:
-                self._voice_dispatcher(something)
-            else:
-                self.send_message(something.type, something.packet)
+            try:
+                something = self.msg_queue.get(timeout=self.TIMEOUT)
+                if type(something) is AudioData:
+                    self._voice_dispatcher(something)
+                else:
+                    self.send_message(something.type, something.packet)
+            except (TimeoutError, Empty):
+                pass
         try:
             self._ready.release()
         except RuntimeError:
             pass
         self.logger.debug(f"exiting send loop. Status: {self.status} Exit: {exit_}")
-
 
     def timeout(self):
         self.status = Status.FAILED
@@ -294,7 +314,7 @@ class ControlStack:
             self.logger.debug("ready lock already released")
         self._disconnect = True
         if self.thread.is_alive():
-            self.thread.join(timeout=10)
+            self.thread.join(timeout=self.TIMEOUT)
         self.logger.debug("disconnected")
 
     def set_application_string(self, string):
