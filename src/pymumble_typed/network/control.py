@@ -64,6 +64,7 @@ class ControlStack:
         self._server_version = (0, 0, 0)
         self._voice_dispatcher: Callable[[AudioData], None] = self.send_audio_legacy
         self.ping = ping
+        self.backoff = 1
 
     def reinit(self) -> ControlStack:
         self.disconnect()
@@ -279,7 +280,17 @@ class ControlStack:
             self.ping.reset()
             if not self.is_connected():
                 self.logger.debug("reconnecting...")
-                self.connect()
+                try:
+                    self.connect()
+                    self.backoff = 1
+                except socket_error:
+                    self.status = Status.FAILED
+                    if self.backoff < 60:
+                        self.backoff *= 2
+                    if self.reconnect:
+                        self.logger.error(f"Connection failed. Retrying in {self.backoff} seconds...")
+                        sleep(self.backoff)
+
             if not self.is_connected() and not self.reconnect:
                 self.logger.debug("connection rejected")
                 raise ConnectionRejectedError("connection refused while connecting to Mumble Server (Murmur)")
