@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from pymumble_typed import MessageType
 from pymumble_typed.commands import Command
 from pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
-from pymumble_typed.network import ConnectionRejectedError, CONNECTION_RETRY_INTERVAL, READ_BUFFER_SIZE
+from pymumble_typed.network import ConnectionRejectedError, READ_BUFFER_SIZE
 from pymumble_typed.network.ping import Ping
 from pymumble_typed.network.udp_data import AudioData
 from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate
@@ -287,9 +287,6 @@ class ControlStack:
                     self.status = Status.FAILED
                     if self.backoff < 60:
                         self.backoff *= 2
-                    if self.reconnect:
-                        self.logger.error(f"Connection failed. Retrying in {self.backoff} seconds...")
-                        sleep(self.backoff)
 
             if not self.is_connected() and not self.reconnect:
                 self.logger.debug("connection rejected")
@@ -312,7 +309,9 @@ class ControlStack:
                         f"exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
                     self.status = Status.FAILED
             self._on_disconnect()
-            sleep(CONNECTION_RETRY_INTERVAL)
+            if self.reconnect:
+                self.logger.error(f"Connection failed. Retrying in {self.backoff} seconds...")
+                sleep(self.backoff)
         try:
             self.socket.close()
         except socket_error:
