@@ -44,6 +44,7 @@ class Mumble:
     def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str = None,
                  key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
                  client_type: ClientType = ClientType.BOT, db_path: str = ":memory:", blob_greedy_update: bool = False,
+                 max_processes: int = 1,
                  debug: bool = False,
                  logger: Logger = None):
         super().__init__()
@@ -56,7 +57,7 @@ class Mumble:
         formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
         handler = StreamHandler(stream=sys.stdout)
         handler.setFormatter(formatter)
-
+        self.max_processes = max_processes
         self._logger = logger.getChild("PyMumble-Typed") if logger else getLogger("PyMumble-Typed")
         self._logger.setLevel(DEBUG if debug else ERROR)
         if not self._logger.handlers:

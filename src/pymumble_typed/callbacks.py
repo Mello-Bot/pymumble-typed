@@ -61,7 +61,7 @@ class Callbacks:
         self._logger = client.logger.getChild(self.__class__.__name__)
         self._temp = CallbackDict()
         self._callbacks = CallbackDict()
-        self._pool = ThreadPool()
+        self._pool = ThreadPool(client.max_processes, initializer=initializer)
 
     def dispatch(self, _type: CallbackLiteral, *args):
         try:
