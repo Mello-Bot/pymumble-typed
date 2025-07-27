@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import current_thread
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -17,6 +18,8 @@ decoder: OpusDecoder = OpusDecoder(SAMPLE_RATE, 2)
 
 def initializer():
     global decoder
+    thread = current_thread()
+    thread.name = f"VoiceDecoder[{thread.ident}]"
     decoder = OpusDecoder(SAMPLE_RATE, 2)
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 from multiprocessing.pool import ThreadPool
+from threading import current_thread
 from typing import TYPE_CHECKING, TypedDict, Literal
 
 if TYPE_CHECKING:
@@ -50,6 +51,9 @@ class CallbackDict(TypedDict, total=False):
     on_acl_received: NotRequired[OnACLReceived]
     on_permission_denied: NotRequired[OnPermissionDenied]
 
+def initializer():
+    thread = current_thread()
+    thread.name = f"Callback[{thread.ident}]"
 
 class Callbacks:
     def __init__(self, client: Mumble):
