@@ -182,7 +182,7 @@ class ControlStack:
                     packet = packet[sent:]
                 else:
                     self._tcp_failed(_type, message)
-                    packet = bytes()
+                    packet = b''
         except (SSLError, TimeoutError):
             self._tcp_failed(_type, message)
 
@@ -226,7 +226,7 @@ class ControlStack:
                     tcp_packet = tcp_packet[sent:]
                 else:
                     self._tcp_failed()
-                    tcp_packet = bytes()
+                    tcp_packet = b''
                 tcp_packet = tcp_packet[sent:]
             except SSLError:
                 self.status = Status.FAILED
