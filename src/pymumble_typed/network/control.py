@@ -65,6 +65,7 @@ class ControlStack:
         self._voice_dispatcher: Callable[[AudioData], None] = self.send_audio_legacy
         self.ping = ping
         self.backoff = 1
+        self.parent_thread = current_thread()
 
     def reinit(self) -> ControlStack:
         self.disconnect()
@@ -238,9 +239,8 @@ class ControlStack:
 
     def _listen(self):
         exit_ = False
-        parent_thread = current_thread()
         while self.is_connected() and not self._disconnect:
-            if not parent_thread.is_alive():
+            if not self.parent_thread.is_alive():
                 self.disconnect()
             self._read_control_messages()
         try:
@@ -251,9 +251,8 @@ class ControlStack:
 
     def _send(self):
         exit_ = False
-        parent_thread = current_thread()
         while self.is_connected() and not self._disconnect:
-            if not parent_thread.is_alive():
+            if not self.parent_thread.is_alive():
                 self.disconnect()
             try:
                 something = self.msg_queue.get(timeout=self.TIMEOUT)
