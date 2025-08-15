@@ -192,6 +192,13 @@ class Mumble:
         packet.ParseFromString(message)
         match msg_type:
             case MessageType.Version:
+                # FIXME: this is a workaround, I didn't consider that the users would change their session ID after
+                #    a reconnect. Without clearing the user map, the user would be set duplicated.
+                #    We are clearing the channels map as well for good measure.
+                #    At this time there's no usable callback to the Mumble class to clear the user map, so we clear that
+                #    once the Version packet is received, as the connection is starting at this point.
+                self.users.clear()
+                self.channels.clear()
                 self._control.set_version(packet)
                 self._logger.debug(f"received version: {packet.version_v1}")
                 if self._control.server_version < (1, 5, 0):
