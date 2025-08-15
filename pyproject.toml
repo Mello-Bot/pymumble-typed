@@ -8,7 +8,7 @@ version = "4.1.9"
 dependencies = [
     "pycryptodomex==3.23.0",
     "opuslib==3.0.1",
-    "protobuf==6.31.1"
+    "protobuf==6.32.0"
 ]
 requires-python = ">= 3.11"
 authors = [
@@ -44,6 +44,5 @@ Issues = "https://github.com/Mello-Bot/pymumble-typed/issues"
 
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools==1.73.0",
-    "types-protobuf==5.29.1.20250403"
+    "grpcio-tools==1.74.0",
 ]
