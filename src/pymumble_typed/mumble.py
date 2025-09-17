@@ -120,6 +120,11 @@ class Mumble:
     def ready(self):
         return self._ready
 
+    def is_connected(self) -> bool:
+        if not self._control:
+            return False
+        return self._control.is_connected()
+
     def start(self):
         self._init()
         self._control.connect()
