@@ -45,4 +45,5 @@ Issues = "https://github.com/Mello-Bot/pymumble-typed/issues"
 [project.optional-dependencies]
 dev = [
     "grpcio-tools==1.74.0",
+    "ruff==0.13.0"
 ]
