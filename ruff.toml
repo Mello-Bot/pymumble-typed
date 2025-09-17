@@ -26,7 +26,7 @@ exclude = [
     "node_modules",
     "site-packages",
     "venv",
-    "mello/plugins/protocol"
+    "src/pymumble_typed/protobuf"
 ]
 
 # Same as Black.
