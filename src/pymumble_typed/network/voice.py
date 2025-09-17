@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from _socket import SHUT_RDWR
+from contextlib import suppress
 from threading import Thread, Lock
 from time import sleep, time, time_ns
 from typing import TYPE_CHECKING
@@ -118,6 +120,9 @@ class VoiceStack:
                 self.logger.error("Exception occurred while sending UDP packet", exc_info=True)
                 if time() - self.control.ping.udp.last_received > 3:
                     self._ping_timeout()
+            except BrokenPipeError:
+                self._ping_timeout()
+                self.exit = True
         elif not data.is_ping:
             self.control.enqueue_audio(data)
         else:
@@ -127,8 +132,12 @@ class VoiceStack:
         while self.active and not self.exit and self.control.is_connected():
             try:
                 response = self.socket.recv(512)
-                decrypted = self.ocb.decrypt(response)
-                self._dispatcher(decrypted)
+                if response:
+                    decrypted = self.ocb.decrypt(response)
+                    self._dispatcher(decrypted)
+                else:
+                    self.logger.warning("Received UDP empty packet")
+                    self.exit = True
             except BlockingIOError:
                 self.logger.error("blockingIOError, packet may will be lost in the next seconds")
                 sleep(1)
@@ -162,6 +171,10 @@ class VoiceStack:
         self.control.ping.udp.update(ping_time / 1000000)
 
     def stop(self):
+        self.logger.debug("Disconnecting from UDP")
+        if self.socket:
+            with suppress(OSError):
+                self.socket.shutdown(SHUT_RDWR)
         self.exit = True
         self._listen_thread.join()
 

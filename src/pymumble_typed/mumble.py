@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 from typing import TypedDict, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -10,6 +11,7 @@ import sys
 from enum import IntEnum
 from logging import getLogger, ERROR, DEBUG, StreamHandler, Formatter
 from threading import current_thread
+from signal import SIGINT, signal
 
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.callbacks import Callbacks
@@ -85,6 +87,7 @@ class Mumble:
         self._ping.set_control(self._control)
         self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
+        signal(SIGINT, lambda _, __: self.stop())
 
     @property
     def sound_output(self):
@@ -357,7 +360,9 @@ class Mumble:
         return self.settings["server_max_message_length"]
 
     def stop(self):
-        self._control.disconnect()
+        self.logger.debug("Received Termination Signal. Stopping Mumble client...")
+        self._control.disconnect(True)
+        self._voice.stop()
 
     def request_blob(self, packet):
         self._control.send_message(MessageType.RequestBlob, packet)

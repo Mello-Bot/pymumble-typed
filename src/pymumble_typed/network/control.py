@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from _socket import SHUT_RDWR
+from contextlib import suppress
 from enum import IntEnum
 from queue import Queue, Empty
 from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
@@ -186,6 +188,9 @@ class ControlStack:
                     packet = b''
         except (SSLError, TimeoutError):
             self._tcp_failed(_type, message)
+        except BrokenPipeError:
+            self._disconnect = True
+            self.status = Status.FAILED
 
     def _read_control_messages(self):
         try:
@@ -238,7 +243,6 @@ class ControlStack:
         self.send_message(MessageType.UDPTunnel, audio.tcp_packet)
 
     def _listen(self):
-        exit_ = False
         while self.is_connected() and not self._disconnect:
             if not self.parent_thread.is_alive():
                 self.disconnect()
@@ -247,10 +251,9 @@ class ControlStack:
             self._ready.release()
         except RuntimeError:
             pass
-        self.logger.debug(f"exiting listen loop. Status: {self.status} Exit: {exit_}")
+        self.logger.debug(f"exiting listen loop. Status: {self.status}")
 
     def _send(self):
-        exit_ = False
         while self.is_connected() and not self._disconnect:
             if not self.parent_thread.is_alive():
                 self.disconnect()
@@ -262,11 +265,9 @@ class ControlStack:
                     self.send_message(something.type, something.packet)
             except (TimeoutError, Empty):
                 pass
-        try:
+        with suppress(RuntimeError):
             self._ready.release()
-        except RuntimeError:
-            pass
-        self.logger.debug(f"exiting send loop. Status: {self.status} Exit: {exit_}")
+        self.logger.debug(f"exiting send loop. Status: {self.status}")
 
     def timeout(self):
         self.status = Status.FAILED
@@ -300,7 +301,9 @@ class ControlStack:
                     listen_thread.start()
                     send_thread.start()
                     listen_thread.join()
+                    self.logger.debug("Listen Thread terminated")
                     send_thread.join()
+                    self.logger.debug("Send Thread terminated")
                     self.ping.cancel()
                     self._ready.acquire(True)
                 except socket_error as e:
@@ -308,7 +311,7 @@ class ControlStack:
                         f"exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
                     self.status = Status.FAILED
             self._on_disconnect()
-            if self.reconnect:
+            if self.reconnect and not self._disconnect:
                 self.logger.error(f"Connection failed. Retrying in {self.backoff} seconds...")
                 sleep(self.backoff)
         try:
@@ -316,14 +319,18 @@ class ControlStack:
         except socket_error:
             self.logger.debug("trying to close already close socket!")
 
-    def disconnect(self):
+    def disconnect(self, force: bool=False):
+        self.logger.debug("Disconnecting from TCP")
         try:
             self._ready.release()
         except RuntimeError:
             self.logger.debug("ready lock already released")
         self._disconnect = True
         if self.thread.is_alive():
-            self.thread.join(timeout=self.TIMEOUT)
+            self.thread.join(timeout=int(not force) * self.TIMEOUT)
+        if self.socket:
+            with suppress(OSError):
+                self.socket.shutdown(SHUT_RDWR)
         self.logger.debug("disconnected")
 
     def set_application_string(self, string):
