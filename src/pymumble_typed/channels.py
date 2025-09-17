@@ -4,14 +4,23 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pymumble_typed.blobs import BlobDB
-    from pymumble_typed.protobuf.Mumble_pb2 import ChannelState
     from pymumble_typed.mumble import Mumble
+    from pymumble_typed.protobuf.Mumble_pb2 import ChannelState
     from pymumble_typed.users import User
-from pymumble_typed.acl import ACL
-from pymumble_typed.commands import CreateChannel, RemoveChannel, Move, TextMessage, LinkChannel, UnlinkChannel, \
-    UpdateChannel, QueryACL, RequestBlobCmd
-
 from threading import Lock
+
+from pymumble_typed.acl import ACL
+from pymumble_typed.commands import (
+    CreateChannel,
+    LinkChannel,
+    Move,
+    QueryACL,
+    RemoveChannel,
+    RequestBlobCmd,
+    TextMessage,
+    UnlinkChannel,
+    UpdateChannel,
+)
 
 
 class Channel:
@@ -106,7 +115,7 @@ class Channel:
             return None
 
     def get_users(self) -> list[User]:
-        return list([user for user in self._mumble.users.values() if user.channel_id == self.id])
+        return [user for user in self._mumble.users.values() if user.channel_id == self.id]
 
     def move_in(self, user: User | None = None):
         if user is None:
@@ -131,7 +140,7 @@ class Channel:
         self._mumble.execute_command(command)
 
     def unlink_all(self):
-        command = UnlinkChannel(self.id, remove_ids=[link for link in self.links])
+        command = UnlinkChannel(self.id, remove_ids=self.links)
         self._mumble.execute_command(command)
 
     def rename(self, name: str):

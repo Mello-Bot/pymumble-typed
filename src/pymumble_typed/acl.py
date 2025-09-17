@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.protobuf import (ACL as ACLPacket)
     from pymumble_typed.mumble import Mumble
+    from pymumble_typed.protobuf.Mumble_pb2 import ACL as ACLPacket
 
 from threading import Lock
 
@@ -15,9 +15,9 @@ class ChannelGroup:
         self.inherited = group.inherited
         self.inherit = group.inherit
         self.inheritable = group.inheritable
-        self.add: list[int] = list([add for add in group.add])
-        self.remove: list[int] = list([remove for remove in group.remove])
-        self.inherited_members: list[int] = list([member for member in group.inherited_members])
+        self.add: list[int] = list(group.add)
+        self.remove: list[int] = list(group.remove)
+        self.inherited_members: list[int] = list(group.inherited_members)
 
     def update(self, packet: ACLPacket.ChanGroup):
         self.name = packet.name
@@ -30,11 +30,11 @@ class ChannelGroup:
             self.inheritable = packet.inheritable
 
         if packet.add:
-            self.add: list[int] = list([add for add in packet.add])
+            self.add: list[int] = list(packet.add)
         if packet.remove:
-            self.remove: list[int] = list([remove for remove in packet.remove])
+            self.remove: list[int] = list(packet.remove)
         if packet.inherited_members:
-            self.inherited_members: list[int] = list([member for member in packet.inherited_members])
+            self.inherited_members: list[int] = list(packet.inherited_members)
 
 
 class ChannelACL:

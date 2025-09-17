@@ -1,4 +1,4 @@
-from enum import IntEnum, Enum
+from enum import Enum, IntEnum
 
 AUDIO_PER_PACKET = 0.02
 READ_BUFFER_SIZE: int = 4096

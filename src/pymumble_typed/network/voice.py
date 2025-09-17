@@ -1,25 +1,25 @@
 from __future__ import annotations
 
-from _socket import SHUT_RDWR
-from contextlib import suppress
-from threading import Thread, Lock
-from time import sleep, time, time_ns
 from typing import TYPE_CHECKING
 
-from pymumble_typed import MessageType, UdpMessageType
-from pymumble_typed.network.control import ControlStack
-from pymumble_typed.network.udp_data import PingData, UDPData
-from pymumble_typed.tools import VarInt
-
 if TYPE_CHECKING:
-    from logging import Logger
     from collections.abc import Callable
+    from logging import Logger
 
+    from pymumble_typed.network.control import ControlStack
+    from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
+
+from _socket import SHUT_RDWR
+from contextlib import suppress
+from socket import AF_INET, SOCK_DGRAM, gaierror, socket
+from threading import Lock, Thread
+from time import sleep, time, time_ns
+
+from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.crypto.ocb2 import CryptStateOCB2
-from socket import socket, AF_INET, SOCK_DGRAM, gaierror
-
+from pymumble_typed.network.udp_data import PingData, UDPData
 from pymumble_typed.protobuf.Mumble_pb2 import CryptSetup
-from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping
+from pymumble_typed.tools import VarInt
 
 
 class VoiceStack:
@@ -34,7 +34,7 @@ class VoiceStack:
         self.control = control
         self.active = False
         self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
-        # FIXME: Why was this false before? And why is this needed? When does it should stop checking UDP?
+        # FIXME(nico9889): Why was this false before? And why is this needed? When does it should stop checking UDP?
         self.check_connection = True
         self._crypt_lock = Lock()
         self._last_lost = 0
@@ -159,7 +159,7 @@ class VoiceStack:
             self.logger.debug("handling lost UDP ping")
             self.control.ping.udp.lost += 1
             return
-        elif not self.active:
+        if not self.active:
             self.last_good_ping = time()
             self.logger.debug("handling UDP ping, resuming inactive connection")
             self.enable_udp()

@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from logging import Logger
 
 import sqlite3
-from base64 import b64encode, b64decode
+from base64 import b64decode, b64encode
 from threading import Lock
 
 
@@ -79,7 +79,7 @@ class BlobDB:
             self._logger.error("Failed to update user comment", exc_info=True)
             result = False
         self._lock.release()
-        return not not result
+        return bool(result)
 
     def update_user_texture(self, user_hash: str, texture_hash: str, texture: bytes):
         self._logger.debug(f"updating user {user_hash} texture: {texture_hash}")
@@ -126,7 +126,7 @@ class BlobDB:
             self._logger.error("Failed to check user comment", exc_info=True)
             result = False
         self._lock.release()
-        return not not result
+        return bool(result)
 
     def update_channel_description(self, channel_id: int, description_hash: str, description: str):
         self._logger.debug(f"updating channel {channel_id} description: {description_hash}")
@@ -173,4 +173,4 @@ class BlobDB:
             self._logger.error("Failed to check channel description", exc_info=True)
             result = False
         self._lock.release()
-        return not not result
+        return bool(result)

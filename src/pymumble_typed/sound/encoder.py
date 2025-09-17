@@ -1,8 +1,10 @@
 from threading import Lock
 
-from opuslib import Encoder as OpusEncoder, OpusError
+from opuslib import Encoder as OpusEncoder
+from opuslib import OpusError
+
 from pymumble_typed.network.voice import VoiceStack
-from pymumble_typed.sound import AUDIO_PER_PACKET, SAMPLE_RATE, CodecProfile, BANDWIDTH, CHANNELS
+from pymumble_typed.sound import AUDIO_PER_PACKET, BANDWIDTH, CHANNELS, SAMPLE_RATE, CodecProfile
 
 
 class Encoder:
@@ -29,7 +31,7 @@ class Encoder:
 
     @property
     def encoder_framesize(self):
-        # FIXME: ???
+        # FIXME(nico9889): ???
         return self._audio_per_packet
 
     def _calc_sample_size(self):
@@ -60,7 +62,7 @@ class Encoder:
 
     def _calc_bitrate(self):
         overhead_per_packet = 20
-        # FIXME: ??? self._audio_per_packet == self.encoder_framesize, results 1
+        # FIXME(nico9889): ??? self._audio_per_packet == self.encoder_framesize, results 1
         overhead_per_packet += (3 * int(self._audio_per_packet) / self.encoder_framesize)
         if self._voice.active:
             overhead_per_packet += 12
@@ -88,7 +90,7 @@ class Encoder:
         if adp not in (0.0025, 0.005, 0.01, 0.02, 0.04, 0.06):
             raise ValueError(f"Invalid audio frame duration: {adp}. It must be in [0.0025, 0.005, 0.01, 0.02, 0.04, 0.06].")
         self._audio_per_packet = adp
-        # FIXME: this is changing the framesize
+        # FIXME(nico9889): this is changing the framesize
         self._calc_samples()
 
     @property

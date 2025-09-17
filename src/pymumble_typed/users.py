@@ -6,12 +6,13 @@ if TYPE_CHECKING:
     from pymumble_typed.blobs import BlobDB
     from pymumble_typed.channels import Channel
     from pymumble_typed.mumble import Mumble
-    from pymumble_typed.protobuf.Mumble_pb2 import UserState, UserRemove
+    from pymumble_typed.protobuf.Mumble_pb2 import UserRemove, UserState
 
+from contextlib import suppress
 from threading import Lock
 
+from pymumble_typed.commands import ModUserState, Move, RemoveUser, RequestBlobCmd, TextPrivateMessage
 from pymumble_typed.sound.soundqueue import LegacySoundQueue
-from pymumble_typed.commands import ModUserState, Move, TextPrivateMessage, RemoveUser, RequestBlobCmd
 
 
 class User:
@@ -207,7 +208,7 @@ class User:
         command = ModUserState(self.session, texture=texture)
         self._mumble.execute_command(command)
 
-    def register(self):  # TODO: check if this is correct
+    def register(self):  # TODO(nico9889): check if this is correct
         command = ModUserState(self.session, user_id=0)
         self._mumble.execute_command(command)
 
@@ -215,7 +216,7 @@ class User:
         command = ModUserState(self.session, plugin_context=context_name)
         self._mumble.execute_command(command)
 
-    def move_in(self, channel: Channel, token: str = None):
+    def move_in(self, channel: Channel, token: str | None = None):
         if token:
             self._mumble.reauthenticate(token)
         command = Move(self.session, channel.id)
@@ -280,7 +281,7 @@ class Users(dict[int, User]):
         with self._lock:
             try:
                 user = self[packet.session]
-                # FIXME: packet.session should be removed and a null actor passed.
+                # FIXME(nico9889): packet.session should be removed and a null actor passed.
                 #  It's currently reported back as a self-update to avoid breaking changes
                 actor = self[packet.actor or packet.session]
                 before = user.update(packet)
@@ -311,10 +312,8 @@ class Users(dict[int, User]):
 
     def set_myself(self, session: int):
         self._myself_session = session
-        try:
+        with suppress(KeyError):
             self.myself = self[session]
-        except KeyError:
-            pass
 
     def count(self):
         return len(self)

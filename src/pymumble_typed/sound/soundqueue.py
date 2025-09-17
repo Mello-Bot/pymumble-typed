@@ -6,10 +6,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from logging import Logger
 
-from pymumble_typed.sound import SAMPLE_RATE, AudioType, SEQUENCE_DURATION
-from pymumble_typed.sound.decoder import Decoder
-
 from time import time
+
+from pymumble_typed.sound import SAMPLE_RATE, SEQUENCE_DURATION, AudioType
+from pymumble_typed.sound.decoder import Decoder
 
 
 class SoundChunk:

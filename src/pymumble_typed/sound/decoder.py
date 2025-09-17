@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from threading import current_thread
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from logging import Logger
+
     from pymumble_typed.sound import AudioType
 
-from logging import Logger
 from multiprocessing.pool import ThreadPool
+from threading import current_thread
 
 from opuslib import Decoder as OpusDecoder
-from pymumble_typed.sound import SAMPLE_RATE, READ_BUFFER_SIZE
+
+from pymumble_typed.sound import READ_BUFFER_SIZE, SAMPLE_RATE
 
 decoder: OpusDecoder = OpusDecoder(SAMPLE_RATE, 2)
 

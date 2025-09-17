@@ -14,11 +14,11 @@ SHIFT_BITS = 63
 UINT64_MAX_LIMIT = (1 << 64) - 1
 
 
-class EncryptFailedException(Exception):
+class EncryptFailedError(Exception):
     pass
 
 
-class DecryptFailedException(Exception):
+class DecryptFailedError(Exception):
     pass
 
 
@@ -90,7 +90,7 @@ class CryptStateOCB2:
 
     def decrypt(self, source: bytes) -> bytes:
         if len(source) < 4:
-            raise DecryptFailedException("Source <4 bytes long!")
+            raise DecryptFailedError("Source <4 bytes long!")
 
         restore = False
         save_iv = self.decrypt_iv.copy()
@@ -106,7 +106,7 @@ class CryptStateOCB2:
                 self.decrypt_iv = increment_iv(self.decrypt_iv, 1)
             else:
                 self.decrypt_iv = save_iv
-                raise DecryptFailedException("iv_byte == decrypt_iv[0]")
+                raise DecryptFailedError("iv_byte == decrypt_iv[0]")
         # Received out of order or repeated
         else:
             diff = iv_byte - self.decrypt_iv[0]
@@ -127,7 +127,7 @@ class CryptStateOCB2:
                     self.decrypt_iv[0] = iv_byte
                 else:
                     self.decrypt_iv = save_iv
-                    raise DecryptFailedException("Lost too many packets?")
+                    raise DecryptFailedError("Lost too many packets?")
             elif iv_byte < self.decrypt_iv[0]:
                 if -30 < diff < 0:
                     late = 1
@@ -140,23 +140,23 @@ class CryptStateOCB2:
                     self.decrypt_iv = increment_iv(self.decrypt_iv, 1)
                 else:
                     self.decrypt_iv = save_iv
-                    raise DecryptFailedException("Lost too many packets?")
+                    raise DecryptFailedError("Lost too many packets?")
             else:
                 self.decrypt_iv = save_iv
-                raise DecryptFailedException("iv_byte == decrypt_iv[0]")
+                raise DecryptFailedError("iv_byte == decrypt_iv[0]")
 
             if self.decrypt_history[self.decrypt_iv[0]] == self.decrypt_iv[1]:
                 self.decrypt_iv = save_iv
-                raise DecryptFailedException("decrypt_iv in history")
+                raise DecryptFailedError("decrypt_iv in history")
         try:
             dst, tag = ocb_decrypt(self._aes, source[4:], bytes(self.decrypt_iv), len(source) - 4)
         except:
             self.decrypt_iv = save_iv
-            raise DecryptFailedException("Decryption failed")
+            raise DecryptFailedError("Decryption failed")
 
         if tag[:3] != source[1:4]:
             self.decrypt_iv = save_iv
-            raise DecryptFailedException("Tag didn't match")
+            raise DecryptFailedError("Tag didn't match")
 
         self.decrypt_history[self.decrypt_iv[0]] = self.decrypt_iv[1]
 
@@ -175,10 +175,9 @@ class CryptStateOCB2:
 def S2(block: bytes) -> bytes:
     ll, uu = unpack('>QQ', block)
     carry = ll >> 63
-    block = pack('>QQ',
+    return pack('>QQ',
                  ((ll << 1) | (uu >> 63)) & UINT64_MAX_LIMIT,
                  ((uu << 1) ^ (carry * 0x87)) & UINT64_MAX_LIMIT)
-    return block
 
 
 def S3(block: bytes) -> bytes:
@@ -278,7 +277,7 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
     plain[pos:] = plain_block[:len_remaining]
 
     if not insecure and plain_block[:-1] == delta[:-1]:
-        raise DecryptFailedException('Possibly tampered/able block, discarding.')
+        raise DecryptFailedError('Possibly tampered/able block, discarding.')
 
     '''
     delta = S3(delta)  # S3(delta);

@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pymumble_typed.mumble import Mumble
-    from pymumble_typed.users import User
     from pymumble_typed.channels import Channel
+    from pymumble_typed.mumble import Mumble
     from pymumble_typed.protobuf import TextMessage
+    from pymumble_typed.users import User
 
 
 class TextTooLongError(Exception):

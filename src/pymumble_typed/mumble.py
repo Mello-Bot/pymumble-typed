@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-
-from typing import TypedDict, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -9,26 +8,27 @@ if TYPE_CHECKING:
 import struct
 import sys
 from enum import IntEnum
-from logging import getLogger, ERROR, DEBUG, StreamHandler, Formatter
-from threading import current_thread
+from logging import DEBUG, ERROR, Formatter, StreamHandler, getLogger
 from signal import SIGINT, signal
+from threading import current_thread
 
 from pymumble_typed import MessageType, UdpMessageType
+from pymumble_typed.blobs import BlobDB
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
-from pymumble_typed.commands import Command, VoiceTarget, RequestBlobCmd
+from pymumble_typed.commands import Command, RequestBlobCmd, VoiceTarget
 from pymumble_typed.messages import Message as MessageContainer
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
+from pymumble_typed.network.ping import Ping
 from pymumble_typed.network.voice import VoiceStack
 from pymumble_typed.protobuf import Mumble_pb2
-from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio, Ping as UdpPingPacket
-from pymumble_typed.sound import AudioType, CodecProfile, CodecNotSupportedError, BANDWIDTH
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio
+from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping as UdpPingPacket
+from pymumble_typed.sound import BANDWIDTH, AudioType, CodecNotSupportedError, CodecProfile
 from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
-from pymumble_typed.network.ping import Ping
-from pymumble_typed.blobs import BlobDB
 
 
 class ClientType(IntEnum):
@@ -43,12 +43,12 @@ class Settings(TypedDict):
 
 
 class Mumble:
-    def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str = None,
-                 key_file: str = None, reconnect: bool = False, tokens: list[str] = None, stereo: bool = False,
+    def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str | None = None,
+                 key_file: str | None = None, reconnect: bool = False, tokens: list[str] | None = None, stereo: bool = False,
                  client_type: ClientType = ClientType.BOT, db_path: str = ":memory:", blob_greedy_update: bool = False,
                  max_processes: int = 1,
                  debug: bool = False,
-                 logger: Logger = None):
+                 logger: Logger | None = None):
         super().__init__()
         self._command_limit = 5
         if tokens is None:
@@ -195,7 +195,7 @@ class Mumble:
         packet.ParseFromString(message)
         match msg_type:
             case MessageType.Version:
-                # FIXME: this is a workaround, I didn't consider that the users would change their session ID after
+                # FIXME(nico9889): this is a workaround, I didn't consider that the users would change their session ID after
                 #    a reconnect. Without clearing the user map, the user would be set duplicated.
                 #    We are clearing the channels map as well for good measure.
                 #    At this time there's no usable callback to the Mumble class to clear the user map, so we clear that
@@ -257,14 +257,14 @@ class Mumble:
                                          packet.type, packet.reason)
             case MessageType.ACL:
                 self.channels[packet.channel_id].update_acl(packet)
-                # FIXME: CALLBACK ACL
+                # FIXME(nico9889): CALLBACK ACL
                 self._callbacks.dispatch("on_acl_received")
             case MessageType.QueryUsers:
                 pass
             case MessageType.CryptSetup:
                 self._voice.crypt_setup(packet)
             case MessageType.ContextActionModify:
-                # FIXME: CALLBACK ContextActionModify
+                # FIXME(nico9889): CALLBACK ContextActionModify
                 self._callbacks.dispatch("on_context_action")
             case MessageType.ContextAction | MessageType.UserList | MessageType.VoiceTarget | MessageType.PermissionQuery | MessageType.CodecVersion | MessageType.UserStats:
                 pass
@@ -316,7 +316,7 @@ class Mumble:
                     if sound is None:
                         return
                     self._callbacks.dispatch("on_sound_received", user, sound)
-                    sequence.value += int(round(sound.duration / 100))
+                    sequence.value += sound.duration // 100
                 except CodecNotSupportedError:
                     self._logger.error("codec not supported", exc_info=True)
                 except KeyError:

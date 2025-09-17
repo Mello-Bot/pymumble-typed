@@ -6,9 +6,9 @@ if TYPE_CHECKING:
     from pymumble_typed.network.control import ControlStack
     from pymumble_typed.network.voice import VoiceStack
 
+from math import sqrt
 from threading import Timer
 from time import time
-from math import sqrt
 
 from pymumble_typed import MessageType
 from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket

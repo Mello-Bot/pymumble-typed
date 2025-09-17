@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-
-from multiprocessing.pool import ThreadPool
-from threading import current_thread
-from typing import TYPE_CHECKING, TypedDict, Literal
+from contextlib import suppress
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import NotRequired
-    from pymumble_typed.sound.soundqueue import SoundChunk
-    from pymumble_typed.mumble import Mumble
-    from pymumble_typed.users import User
-    from pymumble_typed.messages import Message
+
     from pymumble_typed.channels import Channel
+    from pymumble_typed.messages import Message
+    from pymumble_typed.mumble import Mumble
+    from pymumble_typed.sound.soundqueue import SoundChunk
+    from pymumble_typed.users import User
 
     CallbackLiteral = Literal[
         "on_connect", "on_disconnect",
@@ -34,6 +33,9 @@ if TYPE_CHECKING:
     OnContextAction = Callable[[None], None]
     OnACLReceived = Callable[[None], None]
     OnPermissionDenied = Callable[[int, int, str, str, str], None]
+
+from multiprocessing.pool import ThreadPool
+from threading import current_thread
 
 
 class CallbackDict(TypedDict, total=False):
@@ -65,12 +67,9 @@ class Callbacks:
 
     def dispatch(self, _type: CallbackLiteral, *args):
         try:
-            callback = self._callbacks[_type]
-            self._pool.apply_async(callback, args)
-        except KeyError:
-            pass
-        except TypeError:
-            pass
+            with suppress(KeyError, TypeError):
+                callback = self._callbacks[_type]
+                self._pool.apply_async(callback, args)
         except Exception:
             self._logger.error("Error while executing callback", exc_info=True)
 

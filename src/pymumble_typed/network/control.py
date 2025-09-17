@@ -1,30 +1,33 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from logging import Logger
+    from ssl import SSLSocket
+
+    from google.protobuf.message import Message
+
+    from pymumble_typed.mumble import ClientType
+
 from _socket import SHUT_RDWR
 from contextlib import suppress
 from enum import IntEnum
-from queue import Queue, Empty
-from socket import getaddrinfo, AF_UNSPEC, SOCK_STREAM, socket, error as socket_error
-from ssl import SSLContext, PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLError, SSLEOFError
+from queue import Empty, Queue
+from socket import AF_UNSPEC, SOCK_STREAM, getaddrinfo, socket
+from ssl import PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLContext, SSLEOFError, SSLError
 from struct import pack, unpack
-from threading import Thread, current_thread, Lock
+from threading import Lock, Thread, current_thread
 from time import sleep
-from typing import TYPE_CHECKING
 
 from pymumble_typed import MessageType
 from pymumble_typed.commands import Command
-from pymumble_typed.constants import PROTOCOL_VERSION, OS, OS_VERSION, VERSION
-from pymumble_typed.network import ConnectionRejectedError, READ_BUFFER_SIZE
+from pymumble_typed.constants import OS, OS_VERSION, PROTOCOL_VERSION, VERSION
+from pymumble_typed.network import READ_BUFFER_SIZE, ConnectionRejectedError
 from pymumble_typed.network.ping import Ping
 from pymumble_typed.network.udp_data import AudioData
-from pymumble_typed.protobuf.Mumble_pb2 import Version, Authenticate
-
-if TYPE_CHECKING:
-    from pymumble_typed.mumble import ClientType
-    from google.protobuf.message import Message
-    from logging import Logger
-    from ssl import SSLSocket
-    from collections.abc import Callable
+from pymumble_typed.protobuf.Mumble_pb2 import Authenticate, Version
 
 
 class Status(IntEnum):
@@ -115,7 +118,7 @@ class ControlStack:
             info = getaddrinfo(self.host, self.port, AF_UNSPEC, SOCK_STREAM)
             socket_ = socket(info[0][0], SOCK_STREAM)
             socket_.settimeout(self.TIMEOUT)
-        except socket_error as exc:
+        except OSError as exc:
             self.status = Status.FAILED
             self.logger.error("failed to connect to the server", exc_info=True)
             raise exc
@@ -133,7 +136,7 @@ class ControlStack:
 
         try:
             self.socket.connect((self.host, self.port))
-        except socket_error as se:
+        except OSError as se:
             self.status = Status.FAILED
             self.logger.error("error while upgrading to encrypted connection", exc_info=True)
             raise se
@@ -145,7 +148,7 @@ class ControlStack:
             self.logger.debug("authenticating...")
             authenticate = self._craft_authentication_packet()
             self.send_message(MessageType.Authenticate, authenticate)
-        except socket_error as exc:
+        except OSError as exc:
             self.status = Status.FAILED
             self.logger.error("failed to send authentication messages", exc_info=True)
             raise exc
@@ -164,7 +167,7 @@ class ControlStack:
                 exc_info=True)
         else:
             self.logger.error(
-                f"an error occurred while sending a TCP Packet. Attempting to reconnect and resend the packet.",
+                "an error occurred while sending a TCP Packet. Attempting to reconnect and resend the packet.",
                 exc_info=True)
         self.status = Status.FAILED
         if not _type or not message:
@@ -200,7 +203,7 @@ class ControlStack:
             self.logger.warning("Server terminated the connection", exc_info=True)
             self.status = Status.FAILED
             return
-        except socket_error:
+        except OSError:
             self.logger.error("error while reading control messages", exc_info=True)
             return
 
@@ -239,7 +242,7 @@ class ControlStack:
                 return
 
     def send_audio(self, audio: AudioData):
-        self.logger.debug(f"sending audio protobuf")
+        self.logger.debug("sending audio protobuf")
         self.send_message(MessageType.UDPTunnel, audio.tcp_packet)
 
     def _listen(self):
@@ -247,24 +250,20 @@ class ControlStack:
             if not self.parent_thread.is_alive():
                 self.disconnect()
             self._read_control_messages()
-        try:
+        with suppress(RuntimeError):
             self._ready.release()
-        except RuntimeError:
-            pass
         self.logger.debug(f"exiting listen loop. Status: {self.status}")
 
     def _send(self):
         while self.is_connected() and not self._disconnect:
             if not self.parent_thread.is_alive():
                 self.disconnect()
-            try:
+            with suppress(TimeoutError, Empty):
                 something = self.msg_queue.get(timeout=self.TIMEOUT)
                 if type(something) is AudioData:
                     self._voice_dispatcher(something)
                 else:
                     self.send_message(something.type, something.packet)
-            except (TimeoutError, Empty):
-                pass
         with suppress(RuntimeError):
             self._ready.release()
         self.logger.debug(f"exiting send loop. Status: {self.status}")
@@ -283,7 +282,7 @@ class ControlStack:
                 try:
                     self.connect()
                     self.backoff = 1
-                except socket_error:
+                except OSError:
                     self.status = Status.FAILED
                     if self.backoff < 60:
                         self.backoff *= 2
@@ -306,7 +305,7 @@ class ControlStack:
                     self.logger.debug("Send Thread terminated")
                     self.ping.cancel()
                     self._ready.acquire(True)
-                except socket_error as e:
+                except OSError as e:
                     self.logger.error(
                         f"exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
                     self.status = Status.FAILED
@@ -316,7 +315,7 @@ class ControlStack:
                 sleep(self.backoff)
         try:
             self.socket.close()
-        except socket_error:
+        except OSError:
             self.logger.debug("trying to close already close socket!")
 
     def disconnect(self, force: bool=False):
@@ -351,10 +350,8 @@ class ControlStack:
 
     def ready(self):
         self.logger.debug("releasing ready lock")
-        try:
+        with suppress(RuntimeError):
             self._ready.release()
-        except RuntimeError:
-            pass
 
     def is_ready(self):
         self.logger.debug("checking if ready")
