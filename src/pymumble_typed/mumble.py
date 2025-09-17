@@ -144,6 +144,7 @@ class Mumble:
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self.voice = VoiceOutput(self._control, self._voice)
+        self._control.set_disconnect_action(lambda : self.callbacks.dispatch("on_disconnect"))
         self._ping.set_control(self._control)
         self._ping.set_voice(self._voice)
         self._ping.reset()

@@ -38,7 +38,7 @@ class Status(IntEnum):
 
 
 class ControlStack:
-    # This is twice the ping delay because it shouldn't timeout before receiving ping responses
+    # This is twice the ping delay because it shouldn't time out before receiving ping responses
     TIMEOUT = Ping.DELAY * 2
 
     def __init__(self, host: str, port: int, user: str, password: str | None, tokens: list[str], cert_file: str,
@@ -57,7 +57,7 @@ class ControlStack:
         self.status = Status.NOT_CONNECTED
         self._disconnect = False
         self.reconnect = False
-        self._on_disconnect: Callable[[], None] = lambda: None
+        self._on_disconnect: Callable[[], None] = lambda: print("Unset Disconnect")
         self.msg_queue: Queue[Command | AudioData] = Queue(maxsize=20)
         self.audio_queue: Queue[AudioData] = Queue(maxsize=20)
         self.receive_buffer: bytes = b''
@@ -157,7 +157,9 @@ class ControlStack:
             self.thread = Thread(target=self.loop, name="ControlStack:ListenLoop")
             self.thread.start()
 
-    def on_disconnect(self, func: Callable[[], None]):
+    def set_disconnect_action(self, func: Callable[[], None]):
+        print("Setting disconnect action")
+        func()
         self._on_disconnect = func
 
     def _tcp_failed(self, _type: MessageType = None, message: Message = None):
@@ -309,7 +311,7 @@ class ControlStack:
                     self.logger.error(
                         f"exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
                     self.status = Status.FAILED
-            self._on_disconnect()
+                self._on_disconnect()
             if self.reconnect and not self._disconnect:
                 self.logger.error(f"Connection failed. Retrying in {self.backoff} seconds...")
                 sleep(self.backoff)
