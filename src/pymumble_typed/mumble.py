@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
@@ -87,7 +88,9 @@ class Mumble:
         self._ping.set_control(self._control)
         self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
-        signal(SIGINT, lambda _, __: self.stop())
+
+        with suppress(ValueError): # Workaround for Python 3.14, signal worked on Python <=3.13
+            signal(SIGINT, lambda _, __: self.stop())
 
     @property
     def sound_output(self):
