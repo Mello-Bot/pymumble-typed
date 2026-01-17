@@ -13,7 +13,7 @@ from pymumble_typed.sound.decoder import Decoder
 
 
 class SoundChunk:
-    def __init__(self, pcm, sequence, calculated_time, _type, target, timestamp: float = time()):
+    def __init__(self, pcm: bytes, sequence: int, calculated_time, _type, target, timestamp: float = time()):
         self.time = calculated_time
         self.pcm = pcm
         self.sequence = sequence
@@ -61,7 +61,7 @@ class LegacySoundQueue(SoundQueue):
             return
         self._decoder.decode(audio, sequence, _type, target)
 
-    def _on_decoded(self, data: (bytes, int, AudioType, int)):
+    def _on_decoded(self, data: tuple[bytes, int, AudioType, int]):
         pcm, sequence, _type, target = data
         self._logger.debug(f"LegacySoundQueue: decoded audio {len(pcm)}")
         if not self._start_sequence or sequence <= self._start_sequence:
