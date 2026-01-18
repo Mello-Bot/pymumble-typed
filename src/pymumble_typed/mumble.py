@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import suppress
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
@@ -8,6 +7,7 @@ if TYPE_CHECKING:
 
 import struct
 import sys
+from contextlib import suppress
 from enum import IntEnum
 from logging import DEBUG, ERROR, Formatter, StreamHandler, getLogger
 from signal import SIGINT, signal
@@ -27,6 +27,7 @@ from pymumble_typed.protobuf import Mumble_pb2
 from pymumble_typed.protobuf.MumbleUDP_pb2 import Audio
 from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping as UdpPingPacket
 from pymumble_typed.sound import BANDWIDTH, AudioType, CodecNotSupportedError, CodecProfile
+from pymumble_typed.sound.audio import OpusPacket
 from pymumble_typed.sound.voice import VoiceOutput
 from pymumble_typed.tools import VarInt
 from pymumble_typed.users import Users
@@ -44,12 +45,24 @@ class Settings(TypedDict):
 
 
 class Mumble:
-    def __init__(self, host: str, user: str, port: int = 64738, password: str = '', cert_file: str | None = None,
-                 key_file: str | None = None, reconnect: bool = False, tokens: list[str] | None = None, stereo: bool = False,
-                 client_type: ClientType = ClientType.BOT, db_path: str = ":memory:", blob_greedy_update: bool = False,
-                 max_processes: int = 1,
-                 debug: bool = False,
-                 logger: Logger | None = None):
+    def __init__(
+        self,
+        host: str,
+        user: str,
+        port: int = 64738,
+        password: str = "",
+        cert_file: str | None = None,
+        key_file: str | None = None,
+        reconnect: bool = False,
+        tokens: list[str] | None = None,
+        stereo: bool = False,
+        client_type: ClientType = ClientType.BOT,
+        db_path: str = ":memory:",
+        blob_greedy_update: bool = False,
+        max_processes: int = 1,
+        debug: bool = False,
+        logger: Logger | None = None,
+    ):
         super().__init__()
         self._command_limit = 5
         if tokens is None:
@@ -77,19 +90,20 @@ class Mumble:
         self._server_max_bandwidth = 0
         self.users: Users = Users(self, self._blob)
         self.channels: Channels = Channels(self, self._blob)
-        self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
-                                 server_max_image_message_length=131072)
+        self.settings = Settings(
+            server_allow_html=True, server_max_message_length=5000, server_max_image_message_length=131072
+        )
         self._ping: Ping = Ping()
-        self._control: ControlStack = ControlStack(host, port, user, password, tokens, cert_file, key_file, self._ping,
-                                                   client_type,
-                                                   self._logger)
+        self._control: ControlStack = ControlStack(
+            host, port, user, password, tokens, cert_file, key_file, self._ping, client_type, self._logger
+        )
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self._ping.set_voice(self._voice)
         self._ping.set_control(self._control)
         self.voice = VoiceOutput(self._control, self._voice)
         self._reconnect = reconnect
 
-        with suppress(ValueError): # Workaround for Python 3.14, signal worked on Python <=3.13
+        with suppress(ValueError):  # Workaround for Python 3.14, signal worked on Python <=3.13
             signal(SIGINT, lambda _, __: self.stop())
 
     @property
@@ -136,8 +150,9 @@ class Mumble:
         self._bandwidth = BANDWIDTH
         self._server_max_bandwidth = BANDWIDTH
 
-        self.settings = Settings(server_allow_html=True, server_max_message_length=5000,
-                                 server_max_image_message_length=131072)
+        self.settings = Settings(
+            server_allow_html=True, server_max_message_length=5000, server_max_image_message_length=131072
+        )
         self.users = Users(self, self._blob)
         self.channels = Channels(self, self._blob)
         if self._control:
@@ -147,7 +162,7 @@ class Mumble:
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self.voice = VoiceOutput(self._control, self._voice)
-        self._control.set_disconnect_action(lambda : self.callbacks.dispatch("on_disconnect"))
+        self._control.set_disconnect_action(lambda: self.callbacks.dispatch("on_disconnect"))
         self._ping.set_control(self._control)
         self._ping.set_voice(self._voice)
         self._ping.reset()
@@ -199,13 +214,13 @@ class Mumble:
             return
 
         msg_type = MessageType(_type)
-        MsgClass = getattr(Mumble_pb2, msg_type.name)
+        MsgClass = getattr(Mumble_pb2, msg_type.name)  # noqa: N806
         packet = MsgClass()
         packet.ParseFromString(message)
         match msg_type:
             case MessageType.Version:
-                # FIXME(nico9889): this is a workaround, I didn't consider that the users would change their session ID after
-                #    a reconnect. Without clearing the user map, the user would be set duplicated.
+                # FIXME(nico9889): this is a workaround, I didn't consider that the users would change their session ID
+                #    after a reconnect. Without clearing the user map, the user would be set duplicated.
                 #    We are clearing the channels map as well for good measure.
                 #    At this time there's no usable callback to the Mumble class to clear the user map, so we clear that
                 #    once the Version packet is received, as the connection is starting at this point.
@@ -227,18 +242,23 @@ class Mumble:
                 raise ConnectionRejectedError(packet.reason)
             case MessageType.ServerSync:
                 if self.blob_greedy_update:
-                    user_comment_sessions = [user.session for user in self.users.values() if
-                                             not user.is_comment_updated()]
-                    user_texture_sessions = [user.session for user in self.users.values() if
-                                             not user.is_avatar_updated()]
+                    user_comment_sessions = [
+                        user.session for user in self.users.values() if not user.is_comment_updated()
+                    ]
+                    user_texture_sessions = [
+                        user.session for user in self.users.values() if not user.is_avatar_updated()
+                    ]
                     channel_ids = [channel.id for channel in self.channels.values() if channel.needs_update()]
                     if user_comment_sessions or user_texture_sessions or channel_ids:
                         self._logger.debug(
                             f"requesting blob updates for UsersComment({user_comment_sessions}), "
-                            f"UsersTexture({user_texture_sessions}), Channels({channel_ids})")
-                        cmd = RequestBlobCmd(user_texture_hashes=user_texture_sessions,
-                                             user_comment_hashes=user_comment_sessions,
-                                             channel_comment_hashes=channel_ids)
+                            f"UsersTexture({user_texture_sessions}), Channels({channel_ids})"
+                        )
+                        cmd = RequestBlobCmd(
+                            user_texture_hashes=user_texture_sessions,
+                            user_comment_hashes=user_comment_sessions,
+                            channel_comment_hashes=channel_ids,
+                        )
                         self.execute_command(cmd, False)
                 self._voice.sync()
                 self.users.set_myself(packet.session)
@@ -262,8 +282,9 @@ class Mumble:
             case MessageType.TextMessage:
                 self._callbacks.dispatch("on_message", MessageContainer(self, packet))
             case MessageType.PermissionDenied:
-                self._callbacks.dispatch("on_permission_denied", packet.session, packet.channel_id, packet.name,
-                                         packet.type, packet.reason)
+                self._callbacks.dispatch(
+                    "on_permission_denied", packet.session, packet.channel_id, packet.name, packet.type, packet.reason
+                )
             case MessageType.ACL:
                 self.channels[packet.channel_id].update_acl(packet)
                 # FIXME(nico9889): CALLBACK ACL
@@ -275,7 +296,14 @@ class Mumble:
             case MessageType.ContextActionModify:
                 # FIXME(nico9889): CALLBACK ContextActionModify
                 self._callbacks.dispatch("on_context_action")
-            case MessageType.ContextAction | MessageType.UserList | MessageType.VoiceTarget | MessageType.PermissionQuery | MessageType.CodecVersion | MessageType.UserStats:
+            case (
+                MessageType.ContextAction
+                | MessageType.UserList
+                | MessageType.VoiceTarget
+                | MessageType.PermissionQuery
+                | MessageType.CodecVersion
+                | MessageType.UserStats
+            ):
                 pass
             case MessageType.ServerConfig:
                 if packet.HasField("max_bandwidth"):
@@ -295,24 +323,24 @@ class Mumble:
     def _legacy_sound_received(self, _type: AudioType, target: int, packet: bytes):
         pos = 0
         session = VarInt()
-        pos += session.decode(packet[pos: pos + 10])
+        pos += session.decode(packet[pos : pos + 10])
 
         sequence = VarInt()
-        pos += sequence.decode(packet[pos:pos + 10])
+        pos += sequence.decode(packet[pos : pos + 10])
 
         terminator = False
 
         while (pos < len(packet)) and not terminator:
             if _type == AudioType.OPUS:
                 size = VarInt()
-                pos += size.decode(packet[pos:pos + 10])
+                pos += size.decode(packet[pos : pos + 10])
                 size = size.value
 
                 if not (size & 0x2000):
                     terminator = True
-                size &= 0x1fff
+                size &= 0x1FFF
             else:
-                (header,) = struct.unpack("!B", packet[pos:pos + 1])
+                (header,) = struct.unpack("!B", packet[pos : pos + 1])
                 if not (header & 0b10000000):
                     terminator = True
                 size = header & 0b01111111
@@ -321,11 +349,11 @@ class Mumble:
             if size > 0:
                 try:
                     user = self.users[session.value]
-                    sound = user.sound.add(packet[pos:pos + size], sequence.value, _type, target)
-                    if sound is None:
-                        return
-                    self._callbacks.dispatch("on_sound_received", user, sound)
-                    sequence.value += sound.duration // 100
+                    if _type != AudioType.OPUS:
+                        raise CodecNotSupportedError(f"Codec not supported: {_type.name}")
+                    packet = OpusPacket(packet[pos : pos + size], sequence.value, target)
+                    self._callbacks.dispatch("on_sound_received", user, packet)
+                    sequence.value += 1
                 except CodecNotSupportedError:
                     self._logger.error("codec not supported", exc_info=True)
                 except KeyError:
@@ -335,7 +363,10 @@ class Mumble:
     def _sound_received(self, packet: Audio):
         try:
             user = self.users[packet.sender_session]
-            user.sound.add(packet.opus_data, packet.frame_number, AudioType.OPUS, packet.target)
+            wrapper = OpusPacket(packet.opus_data, packet.frame_number, packet.target)
+            self._callbacks.dispatch("on_sound_received", user, wrapper)
+        except CodecNotSupportedError:
+            self._logger.error("codec not supported", exc_info=True)
         except KeyError:
             self._logger.error(f"Invalid user session {packet.sender_session}")
 

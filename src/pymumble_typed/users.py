@@ -12,13 +12,10 @@ from contextlib import suppress
 from threading import Lock
 
 from pymumble_typed.commands import ModUserState, Move, RemoveUser, RequestBlobCmd, TextPrivateMessage
-from pymumble_typed.sound.soundqueue import LegacySoundQueue
 
 
 class User:
     def __init__(self, mumble: Mumble, blob: BlobDB, packet: UserState):
-        self.sound = LegacySoundQueue(lambda sound: mumble.callbacks.dispatch("on_sound_received", self, sound),
-                                      mumble.logger)
         self._mumble: Mumble = mumble
         self._blob = blob
         self.hash: str = packet.hash
@@ -71,12 +68,14 @@ class User:
         return not (self.is_comment_updated() and self.is_avatar_updated())
 
     def is_comment_updated(self):
-        return ((not self.comment) == (not self._comment_hash)) or self._blob.is_user_comment_updated(self.hash,
-                                                                                                      self._comment_hash.hex())
+        return ((not self.comment) == (not self._comment_hash)) or self._blob.is_user_comment_updated(
+            self.hash, self._comment_hash.hex()
+        )
 
     def is_avatar_updated(self):
-        return ((not self.texture) == (not self._texture_hash)) or self._blob.is_user_texture_updated(self.hash,
-                                                                                                      self._texture_hash.hex())
+        return ((not self.texture) == (not self._texture_hash)) or self._blob.is_user_texture_updated(
+            self.hash, self._texture_hash.hex()
+        )
 
     def request_comment(self):
         if not self._comment_hash:
@@ -131,7 +130,7 @@ class User:
             actions["comment"] = self.comment
             self.comment = packet.comment
             if not self.comment:
-                self._comment_hash = b''
+                self._comment_hash = b""
                 self._blob.update_user_comment(self.hash, self._comment_hash.hex(), self.comment)
             if self._comment_hash:
                 self._blob.update_user_comment(self.hash, self._comment_hash.hex(), self.comment)
@@ -144,7 +143,7 @@ class User:
             actions["avatar"] = self.texture
             self.texture = packet.texture
             if not self.texture:
-                self._texture_hash = b''
+                self._texture_hash = b""
                 self._blob.update_user_texture(self.hash, self._texture_hash.hex(), self.texture)
             if self._texture_hash:
                 self._blob.update_user_texture(self.hash, self._texture_hash.hex(), self.texture)
@@ -251,20 +250,22 @@ class User:
         return self.session < other.session
 
     def __str__(self):
-        return str({
-            "hash": self.hash,
-            "session": self.session,
-            "name": self.name,
-            "priority_speaker": self.priority_speaker,
-            "channel_id": self.channel_id,
-            "muted": self.muted,
-            "self_muted": self.self_muted,
-            "deaf": self.deaf,
-            "self_deaf": self.self_deaf,
-            "suppressed": self.suppressed,
-            "comment": self.comment,
-            "texture": self.texture
-        })
+        return str(
+            {
+                "hash": self.hash,
+                "session": self.session,
+                "name": self.name,
+                "priority_speaker": self.priority_speaker,
+                "channel_id": self.channel_id,
+                "muted": self.muted,
+                "self_muted": self.self_muted,
+                "deaf": self.deaf,
+                "self_deaf": self.self_deaf,
+                "suppressed": self.suppressed,
+                "comment": self.comment,
+                "texture": self.texture,
+            }
+        )
 
 
 class Users(dict[int, User]):

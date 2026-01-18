@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import suppress
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
@@ -10,14 +9,24 @@ if TYPE_CHECKING:
     from pymumble_typed.channels import Channel
     from pymumble_typed.messages import Message
     from pymumble_typed.mumble import Mumble
-    from pymumble_typed.sound.soundqueue import SoundChunk
+    from pymumble_typed.sound.audio import OpusPacket
     from pymumble_typed.users import User
 
     CallbackLiteral = Literal[
-        "on_connect", "on_disconnect",
-        "on_channel_created", "on_channel_updated", "on_channel_removed",
-        "on_user_created", "on_user_updated", "on_user_removed",
-        "on_message", "on_sound_received", "on_context_action", "on_acl_received", "on_acl_received", "on_permission_denied"
+        "on_connect",
+        "on_disconnect",
+        "on_channel_created",
+        "on_channel_updated",
+        "on_channel_removed",
+        "on_user_created",
+        "on_user_updated",
+        "on_user_removed",
+        "on_message",
+        "on_sound_received",
+        "on_context_action",
+        "on_acl_received",
+        "on_acl_received",
+        "on_permission_denied",
     ]
 
     OnConnect = Callable[[None], None]
@@ -29,11 +38,12 @@ if TYPE_CHECKING:
     OnUserUpdated = Callable[[User, User, dict], None]
     OnUserRemoved = Callable[[User, User, bool, str], None]
     OnMessage = Callable[[Message], None]
-    OnSoundReceived = Callable[[User, SoundChunk], None]
+    OnSoundReceived = Callable[[User, OpusPacket], None]
     OnContextAction = Callable[[None], None]
     OnACLReceived = Callable[[None], None]
     OnPermissionDenied = Callable[[int, int, str, str, str], None]
 
+from contextlib import suppress
 from multiprocessing.pool import ThreadPool
 from threading import current_thread
 
@@ -53,9 +63,11 @@ class CallbackDict(TypedDict, total=False):
     on_acl_received: NotRequired[OnACLReceived]
     on_permission_denied: NotRequired[OnPermissionDenied]
 
+
 def initializer():
     thread = current_thread()
     thread.name = f"Callback[{thread.ident}]"
+
 
 class Callbacks:
     def __init__(self, client: Mumble):
