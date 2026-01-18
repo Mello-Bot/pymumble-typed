@@ -57,7 +57,7 @@ class ControlStack:
         self.status = Status.NOT_CONNECTED
         self._disconnect = False
         self.reconnect = False
-        self._on_disconnect: Callable[[], None] = lambda: print("Unset Disconnect")
+        self._on_disconnect: Callable[[], None] = lambda: None
         self.msg_queue: Queue[Command | AudioData] = Queue(maxsize=20)
         self.audio_queue: Queue[AudioData] = Queue(maxsize=20)
         self.receive_buffer: bytes = b''
