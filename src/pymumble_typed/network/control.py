@@ -158,7 +158,6 @@ class ControlStack:
             self.thread.start()
 
     def set_disconnect_action(self, func: Callable[[], None]):
-        print("Setting disconnect action")
         func()
         self._on_disconnect = func
 
