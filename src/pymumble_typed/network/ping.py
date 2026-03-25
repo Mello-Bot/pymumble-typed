@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Callable
     from pymumble_typed.network.control import ControlStack
     from pymumble_typed.network.voice import VoiceStack
 
@@ -15,6 +16,10 @@ from pymumble_typed.protobuf.Mumble_pb2 import Ping as PingPacket
 
 
 class RepeatTimer(Timer):
+    def __init__(self, interval: float, function: Callable[[], None], *args, **kwargs):
+        super().__init__(interval, function, args, kwargs)
+        self.daemon = True
+
     def run(self):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
