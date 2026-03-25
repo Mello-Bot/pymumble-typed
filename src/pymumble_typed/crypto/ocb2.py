@@ -184,7 +184,7 @@ def S3(block: bytes) -> bytes:
     return xor(block, S2(block))
 
 
-def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> [bytes, bytes]:
+def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> tuple[bytearray, bytes]:
     delta = aes.encrypt(nonce)
     checksum = bytes(AES_BLOCK_SIZE)
 
@@ -243,7 +243,7 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> [byt
     return encrypted, tag
 
 
-def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, insecure=False) -> [bytes, bytes]:
+def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, insecure=False) -> tuple[bytes, bytes]:
     delta = aes.encrypt(nonce)  # AESencrypt(nonce, delta, raw_key);
     checksum = bytes(AES_BLOCK_SIZE)  # ZERO(checksum);
 
