@@ -13,7 +13,7 @@ class VoiceOutput:
         self.positional: [int, int, int] | None = None
         self._remaining_sample: bytes = b''
         self._encoder: Encoder = Encoder(voice)
-        self._buffer: Queue[bytes] = Queue(maxsize=2 / self._encoder.audio_per_packet)
+        self._buffer: Queue[bytes] = Queue(maxsize=int(2 / self._encoder.audio_per_packet))
         self.target: int = 0
 
         self._control = control
@@ -66,7 +66,7 @@ class VoiceOutput:
             self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
     def clear_buffer(self):
-        self._buffer = Queue(maxsize=2 / self._encoder.audio_per_packet)
+        self._buffer = Queue(maxsize=int(2 / self._encoder.audio_per_packet))
 
     def send_audio(self):
         if not self._buffer.qsize() > 0:
