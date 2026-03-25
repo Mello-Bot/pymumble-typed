@@ -197,7 +197,7 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> [byt
         if length - AES_BLOCK_SIZE <= AES_BLOCK_SIZE:
             sum_ = 0
             for i in range(0, AES_BLOCK_SIZE - 1):
-                sum_ |= plain[pos + i - 1]
+                sum_ |= plain[pos + i]
             flip_a_bit = not insecure and sum_ == 0
 
         delta = S2(delta)  # S2(delta);
