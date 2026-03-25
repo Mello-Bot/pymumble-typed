@@ -33,6 +33,8 @@ class VoiceOutput:
             raise ValueError("pcm data must be 16 bits")
         samples = self._encoder.samples
 
+        # Discard the remaining sample if too much time has passed from the previous sent.
+        # This should avoid adding delay to the audio sent or sending audio out of order.
         if monotonic() - self._sequence_last_time <= self._encoder.audio_per_packet:
             pcm = self._remaining_sample + pcm
         self._remaining_sample = b''
