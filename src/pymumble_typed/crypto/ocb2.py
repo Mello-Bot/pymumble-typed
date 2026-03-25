@@ -150,7 +150,7 @@ class CryptStateOCB2:
                 raise DecryptFailedError("decrypt_iv in history")
         try:
             dst, tag = ocb_decrypt(self._aes, source[4:], bytes(self.decrypt_iv), len(source) - 4)
-        except:
+        except Exception:
             self.decrypt_iv = save_iv
             raise DecryptFailedError("Decryption failed")
 
