@@ -59,10 +59,10 @@ class VoiceOutput:
         # give some slack (2*audio_per_frame) before interrupting a continuous sequence
         elif self._sequence_last_time + (audio_per_packet * 2) <= current_time:
             # calculating sequence after a pause
-            self._sequence = int((current_time - self._sequence_start_time) / SEQUENCE_DURATION)
+            self._sequence = int(round((current_time - self._sequence_start_time) / SEQUENCE_DURATION))
             self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
         else:  # continuous sound
-            self._sequence += int(audio_per_packet / SEQUENCE_DURATION)
+            self._sequence += int(round(audio_per_packet / SEQUENCE_DURATION))
             self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
     def clear_buffer(self):
