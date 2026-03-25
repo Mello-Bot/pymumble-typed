@@ -1,5 +1,5 @@
-from queue import Queue
 from time import sleep, time, monotonic
+from queue import Full, Queue
 
 from pymumble_typed.network.control import ControlStack
 from pymumble_typed.network.udp_data import AudioData
@@ -45,7 +45,7 @@ class VoiceOutput:
             for i in range(0, processed, samples):
                 self._buffer.put(pcm[i:i + samples], block=False)
             self._remaining_sample = pcm[processed:]
-        except:
+        except Full:
             self._logger.warning(f"Buffer is full! Dropping audio packet!")
         self.send_audio()
 
