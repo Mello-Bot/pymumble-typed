@@ -31,6 +31,8 @@ class VoiceOutput:
     def add_pcm(self, pcm: bytes):
         if len(pcm) % 2 != 0:
             raise ValueError("pcm data must be 16 bits")
+        if not self._control.is_connected():
+            raise RuntimeError("client is not connected")
         samples = self._encoder.samples
 
         # Discard the remaining sample if too much time has passed from the previous sent.
@@ -71,7 +73,7 @@ class VoiceOutput:
     def send_audio(self):
         if not self._buffer.qsize() > 0:
             return
-        while self._buffer.qsize() > 0:
+        while self._buffer.qsize() > 0 and self._control.is_connected():
             audio_per_packet = self._encoder.audio_per_packet
             self._update_sequence()
             audio = AudioData()
