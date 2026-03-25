@@ -103,7 +103,7 @@ class CryptStateOCB2:
                 self.decrypt_iv[0] = iv_byte
             elif iv_byte < self.decrypt_iv[0]:
                 self.decrypt_iv[0] = iv_byte
-                self.decrypt_iv = increment_iv(self.decrypt_iv, 1)
+                increment_iv(self.decrypt_iv, 1)
             else:
                 self.decrypt_iv = save_iv
                 raise DecryptFailedError("iv_byte == decrypt_iv[0]")
@@ -120,7 +120,7 @@ class CryptStateOCB2:
                     late = 1
                     lost = -1
                     self.decrypt_iv[0] = iv_byte
-                    self.decrypt_iv = decrement_iv(self.decrypt_iv, 1)
+                    decrement_iv(self.decrypt_iv, 1)
                     restore = True
                 elif diff > 0:
                     lost = iv_byte - self.decrypt_iv[0] - 1
@@ -137,7 +137,7 @@ class CryptStateOCB2:
                 elif diff > 0:
                     lost = 256 - self.decrypt_iv[0] + iv_byte - 1
                     self.decrypt_iv[0] = iv_byte
-                    self.decrypt_iv = increment_iv(self.decrypt_iv, 1)
+                    increment_iv(self.decrypt_iv, 1)
                 else:
                     self.decrypt_iv = save_iv
                     raise DecryptFailedError("Lost too many packets?")
@@ -290,21 +290,19 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
     return bytes(plain), tag
 
 
-def increment_iv(iv: bytearray, start: int = 0) -> bytearray:
+def increment_iv(iv: bytearray, start: int = 0):
     for i in range(start, AES_BLOCK_SIZE):
         iv[i] = (iv[i] + 1) % 0x100
         if iv[i] != 0:
             break
-    return iv
 
 
-def decrement_iv(iv: bytearray, start: int = 0) -> bytearray:
+def decrement_iv(iv: bytearray, start: int = 0):
     for i in range(start, AES_BLOCK_SIZE):
         pre = iv[i]
         iv[i] = (iv[i] - 1) % 0x100
         if pre:
             break
-    return iv
 
 
 def xor(a: bytes, b: bytes) -> bytes:
