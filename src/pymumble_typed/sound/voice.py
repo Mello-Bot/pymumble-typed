@@ -1,5 +1,5 @@
 from queue import Queue
-from time import sleep, time
+from time import sleep, time, monotonic
 
 from pymumble_typed.network.control import ControlStack
 from pymumble_typed.network.udp_data import AudioData
@@ -33,7 +33,7 @@ class VoiceOutput:
             raise ValueError("pcm data must be 16 bits")
         samples = self._encoder.samples
 
-        if time() - self._sequence_last_time <= self._encoder.audio_per_packet:
+        if monotonic() - self._sequence_last_time <= self._encoder.audio_per_packet:
             pcm = self._remaining_sample + pcm
         self._remaining_sample = b''
 
@@ -49,7 +49,7 @@ class VoiceOutput:
 
     def _update_sequence(self):
         audio_per_packet = self._encoder.audio_per_packet
-        current_time = time()
+        current_time = monotonic()
         if self._sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time:
             self._sequence = 0
             self._sequence_start_time = current_time
@@ -83,7 +83,7 @@ class VoiceOutput:
             audio.sequence = self._sequence
             audio.positional = self.positional
             self._voice.send_packet(audio)
-            delay = audio_per_packet - (time() - self._sequence_last_time)
+            delay = audio_per_packet - (monotonic() - self._sequence_last_time)
             if delay >= 0:
                 sleep(delay)
             else:
