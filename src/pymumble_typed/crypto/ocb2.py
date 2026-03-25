@@ -63,7 +63,7 @@ class CryptStateOCB2:
     @decrypt_iv.setter
     def decrypt_iv(self, decrypt_iv: bytearray):
         if len(decrypt_iv) != AES_BLOCK_SIZE:
-            raise Exception('encrypt_iv wrong length')
+            raise Exception('decrypt_iv wrong length')
         self._decrypt_iv = bytearray(decrypt_iv)
 
     def gen_key(self):
