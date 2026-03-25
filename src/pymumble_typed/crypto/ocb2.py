@@ -33,7 +33,7 @@ class CryptStateOCB2:
         self._raw_key = get_random_bytes(AES_KEY_SIZE_BYTES)
         self._encrypt_iv: bytearray = bytearray(get_random_bytes(AES_BLOCK_SIZE))
         self._decrypt_iv: bytearray = bytearray(get_random_bytes(AES_BLOCK_SIZE))
-        self.decrypt_history = bytearray(0x100)
+        self.decrypt_history = [None] * 0x100
 
     @property
     def raw_key(self):
@@ -145,7 +145,7 @@ class CryptStateOCB2:
                 self.decrypt_iv = save_iv
                 raise DecryptFailedError("iv_byte == decrypt_iv[0]")
 
-            if self.decrypt_history[self.decrypt_iv[0]] == self.decrypt_iv[1]:
+            if self.decrypt_history[self.decrypt_iv[0]] == bytes(self.decrypt_iv[1:]):
                 self.decrypt_iv = save_iv
                 raise DecryptFailedError("decrypt_iv in history")
         try:
@@ -158,7 +158,7 @@ class CryptStateOCB2:
             self.decrypt_iv = save_iv
             raise DecryptFailedError("Tag didn't match")
 
-        self.decrypt_history[self.decrypt_iv[0]] = self.decrypt_iv[1]
+        self.decrypt_history[self.decrypt_iv[0]] = bytes(self.decrypt_iv[1:])
 
         if restore:
             self.decrypt_iv = save_iv
