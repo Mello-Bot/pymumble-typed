@@ -64,6 +64,8 @@ class VoiceOutput:
         self._buffer = Queue()
 
     def send_audio(self):
+        if not self._buffer.qsize() > 0:
+            return
         audio_per_packet = self._encoder.audio_per_packet
         self._update_sequence()
         audio = AudioData()
