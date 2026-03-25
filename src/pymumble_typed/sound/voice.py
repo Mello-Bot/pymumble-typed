@@ -11,9 +11,9 @@ from pymumble_typed.sound.encoder import Encoder
 class VoiceOutput:
     def __init__(self, control: ControlStack, voice: VoiceStack):
         self.positional = [0, 0, 0]
-        self._buffer: Queue[bytes] = Queue()
         self._remaining_sample: bytes = b''
         self._encoder: Encoder = Encoder(voice)
+        self._buffer: Queue[bytes] = Queue(maxsize=2 / self._encoder.audio_per_packet)
         self.target: int = 0
 
         self._control = control
@@ -39,9 +39,12 @@ class VoiceOutput:
 
         offset = len(pcm) // samples
         processed = offset * samples
-        for i in range(0, processed, samples):
-            self._buffer.put(pcm[i:i + samples])
-        self._remaining_sample = pcm[processed:]
+        try:
+            for i in range(0, processed, samples):
+                self._buffer.put(pcm[i:i + samples], block=False)
+            self._remaining_sample = pcm[processed:]
+        except:
+            self._logger.warning(f"Buffer is full! Dropping audio packet!")
         self.send_audio()
 
     def _update_sequence(self):
@@ -61,29 +64,30 @@ class VoiceOutput:
             self._sequence_last_time = self._sequence_start_time + (self._sequence * SEQUENCE_DURATION)
 
     def clear_buffer(self):
-        self._buffer = Queue()
+        self._buffer = Queue(maxsize=2 / self._encoder.audio_per_packet)
 
     def send_audio(self):
         if not self._buffer.qsize() > 0:
             return
-        audio_per_packet = self._encoder.audio_per_packet
-        self._update_sequence()
-        audio = AudioData()
-        audio_encoded = 0
-        while self._buffer.qsize() > 0 and audio_encoded < audio_per_packet:
-            pcm = self._buffer.get(block=False)
-            encoded = self._encoder.encode(pcm)
-            audio.add_chunk(encoded)
-            audio_encoded += self._encoder.encoder_framesize
-        audio.target = self.target
-        audio.sequence = self._sequence
-        audio.positional = self.positional
-        self._voice.send_packet(audio)
-        delay = audio_per_packet - (time() - self._sequence_last_time)
-        if delay >= 0:
-            sleep(delay)
-        else:
-            self._logger.warning(f"delay is negative: {delay}!")
+        while self._buffer.qsize() > 0:
+            audio_per_packet = self._encoder.audio_per_packet
+            self._update_sequence()
+            audio = AudioData()
+            audio_encoded = 0
+            while self._buffer.qsize() > 0 and audio_encoded < audio_per_packet:
+                pcm = self._buffer.get(block=False)
+                encoded = self._encoder.encode(pcm)
+                audio.add_chunk(encoded)
+                audio_encoded += self._encoder.encoder_framesize
+            audio.target = self.target
+            audio.sequence = self._sequence
+            audio.positional = self.positional
+            self._voice.send_packet(audio)
+            delay = audio_per_packet - (time() - self._sequence_last_time)
+            if delay >= 0:
+                sleep(delay)
+            else:
+                self._logger.warning(f"delay is negative: {delay}!")
 
     @property
     def encoder(self):
