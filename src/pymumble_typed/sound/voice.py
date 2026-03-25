@@ -1,4 +1,4 @@
-from time import sleep, time, monotonic
+from time import sleep, monotonic
 from queue import Full, Queue
 
 from pymumble_typed.network.control import ControlStack
