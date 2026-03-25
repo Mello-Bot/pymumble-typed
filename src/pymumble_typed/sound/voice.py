@@ -10,7 +10,7 @@ from pymumble_typed.sound.encoder import Encoder
 
 class VoiceOutput:
     def __init__(self, control: ControlStack, voice: VoiceStack):
-        self.positional = [0, 0, 0]
+        self.positional: [int, int, int] | None = None
         self._remaining_sample: bytes = b''
         self._encoder: Encoder = Encoder(voice)
         self._buffer: Queue[bytes] = Queue(maxsize=2 / self._encoder.audio_per_packet)
