@@ -38,10 +38,10 @@ class VoiceOutput:
         self._remaining_sample = b''
 
         offset = len(pcm) // samples
-        i = 0
-        for i in range(0, offset * samples, samples):
+        processed = offset * samples
+        for i in range(0, processed, samples):
             self._buffer.put(pcm[i:i + samples])
-        self._remaining_sample = pcm[i:]
+        self._remaining_sample = pcm[processed:]
         self.send_audio()
 
     def _update_sequence(self):
