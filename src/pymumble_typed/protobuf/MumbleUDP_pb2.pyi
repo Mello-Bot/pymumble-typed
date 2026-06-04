@@ -24,7 +24,7 @@ class Audio(_message.Message):
     positional_data: _containers.RepeatedScalarFieldContainer[float]
     volume_adjustment: float
     is_terminator: bool
-    def __init__(self, target: _Optional[int] = ..., context: _Optional[int] = ..., sender_session: _Optional[int] = ..., frame_number: _Optional[int] = ..., opus_data: _Optional[bytes] = ..., positional_data: _Optional[_Iterable[float]] = ..., volume_adjustment: _Optional[float] = ..., is_terminator: bool = ...) -> None: ...
+    def __init__(self, target: _Optional[int] = ..., context: _Optional[int] = ..., sender_session: _Optional[int] = ..., frame_number: _Optional[int] = ..., opus_data: _Optional[bytes] = ..., positional_data: _Optional[_Iterable[float]] = ..., volume_adjustment: _Optional[float] = ..., is_terminator: _Optional[bool] = ...) -> None: ...
 
 class Ping(_message.Message):
     __slots__ = ("timestamp", "request_extended_information", "server_version_v2", "user_count", "max_user_count", "max_bandwidth_per_user")
@@ -40,4 +40,4 @@ class Ping(_message.Message):
     user_count: int
     max_user_count: int
     max_bandwidth_per_user: int
-    def __init__(self, timestamp: _Optional[int] = ..., request_extended_information: bool = ..., server_version_v2: _Optional[int] = ..., user_count: _Optional[int] = ..., max_user_count: _Optional[int] = ..., max_bandwidth_per_user: _Optional[int] = ...) -> None: ...
+    def __init__(self, timestamp: _Optional[int] = ..., request_extended_information: _Optional[bool] = ..., server_version_v2: _Optional[int] = ..., user_count: _Optional[int] = ..., max_user_count: _Optional[int] = ..., max_bandwidth_per_user: _Optional[int] = ...) -> None: ...

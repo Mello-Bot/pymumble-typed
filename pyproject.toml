@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pymumble-typed"
-version = "5.0.0"
+version = "5.0.1"
 dependencies = [
     "pycryptodomex==3.23.0",
     "opuslib==3.0.1",
-    "protobuf>=6.33.0,<7.0.0"
+    "protobuf>=7.35.0"
 ]
 requires-python = ">= 3.11"
 authors = [
@@ -44,6 +44,6 @@ Issues = "https://github.com/Mello-Bot/pymumble-typed/issues"
 
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools==1.78.0",
-    "ruff==0.15.7"
+    "grpcio-tools==1.81.0",
+    "ruff==0.15.15"
 ]

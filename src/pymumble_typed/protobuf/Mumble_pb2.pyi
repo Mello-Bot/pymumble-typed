@@ -41,7 +41,7 @@ class Authenticate(_message.Message):
     celt_versions: _containers.RepeatedScalarFieldContainer[int]
     opus: bool
     client_type: int
-    def __init__(self, username: _Optional[str] = ..., password: _Optional[str] = ..., tokens: _Optional[_Iterable[str]] = ..., celt_versions: _Optional[_Iterable[int]] = ..., opus: bool = ..., client_type: _Optional[int] = ...) -> None: ...
+    def __init__(self, username: _Optional[str] = ..., password: _Optional[str] = ..., tokens: _Optional[_Iterable[str]] = ..., celt_versions: _Optional[_Iterable[int]] = ..., opus: _Optional[bool] = ..., client_type: _Optional[int] = ...) -> None: ...
 
 class Ping(_message.Message):
     __slots__ = ("timestamp", "good", "late", "lost", "resync", "udp_packets", "tcp_packets", "udp_ping_avg", "udp_ping_var", "tcp_ping_avg", "tcp_ping_var")
@@ -145,7 +145,7 @@ class ChannelState(_message.Message):
     max_users: int
     is_enter_restricted: bool
     can_enter: bool
-    def __init__(self, channel_id: _Optional[int] = ..., parent: _Optional[int] = ..., name: _Optional[str] = ..., links: _Optional[_Iterable[int]] = ..., description: _Optional[str] = ..., links_add: _Optional[_Iterable[int]] = ..., links_remove: _Optional[_Iterable[int]] = ..., temporary: bool = ..., position: _Optional[int] = ..., description_hash: _Optional[bytes] = ..., max_users: _Optional[int] = ..., is_enter_restricted: bool = ..., can_enter: bool = ...) -> None: ...
+    def __init__(self, channel_id: _Optional[int] = ..., parent: _Optional[int] = ..., name: _Optional[str] = ..., links: _Optional[_Iterable[int]] = ..., description: _Optional[str] = ..., links_add: _Optional[_Iterable[int]] = ..., links_remove: _Optional[_Iterable[int]] = ..., temporary: _Optional[bool] = ..., position: _Optional[int] = ..., description_hash: _Optional[bytes] = ..., max_users: _Optional[int] = ..., is_enter_restricted: _Optional[bool] = ..., can_enter: _Optional[bool] = ...) -> None: ...
 
 class UserRemove(_message.Message):
     __slots__ = ("session", "actor", "reason", "ban")
@@ -157,7 +157,7 @@ class UserRemove(_message.Message):
     actor: int
     reason: str
     ban: bool
-    def __init__(self, session: _Optional[int] = ..., actor: _Optional[int] = ..., reason: _Optional[str] = ..., ban: bool = ...) -> None: ...
+    def __init__(self, session: _Optional[int] = ..., actor: _Optional[int] = ..., reason: _Optional[str] = ..., ban: _Optional[bool] = ...) -> None: ...
 
 class UserState(_message.Message):
     __slots__ = ("session", "actor", "name", "user_id", "channel_id", "mute", "deaf", "suppress", "self_mute", "self_deaf", "texture", "plugin_context", "plugin_identity", "comment", "hash", "comment_hash", "texture_hash", "priority_speaker", "recording", "temporary_access_tokens", "listening_channel_add", "listening_channel_remove", "listening_volume_adjustment")
@@ -214,7 +214,7 @@ class UserState(_message.Message):
     listening_channel_add: _containers.RepeatedScalarFieldContainer[int]
     listening_channel_remove: _containers.RepeatedScalarFieldContainer[int]
     listening_volume_adjustment: _containers.RepeatedCompositeFieldContainer[UserState.VolumeAdjustment]
-    def __init__(self, session: _Optional[int] = ..., actor: _Optional[int] = ..., name: _Optional[str] = ..., user_id: _Optional[int] = ..., channel_id: _Optional[int] = ..., mute: bool = ..., deaf: bool = ..., suppress: bool = ..., self_mute: bool = ..., self_deaf: bool = ..., texture: _Optional[bytes] = ..., plugin_context: _Optional[bytes] = ..., plugin_identity: _Optional[str] = ..., comment: _Optional[str] = ..., hash: _Optional[str] = ..., comment_hash: _Optional[bytes] = ..., texture_hash: _Optional[bytes] = ..., priority_speaker: bool = ..., recording: bool = ..., temporary_access_tokens: _Optional[_Iterable[str]] = ..., listening_channel_add: _Optional[_Iterable[int]] = ..., listening_channel_remove: _Optional[_Iterable[int]] = ..., listening_volume_adjustment: _Optional[_Iterable[_Union[UserState.VolumeAdjustment, _Mapping]]] = ...) -> None: ...
+    def __init__(self, session: _Optional[int] = ..., actor: _Optional[int] = ..., name: _Optional[str] = ..., user_id: _Optional[int] = ..., channel_id: _Optional[int] = ..., mute: _Optional[bool] = ..., deaf: _Optional[bool] = ..., suppress: _Optional[bool] = ..., self_mute: _Optional[bool] = ..., self_deaf: _Optional[bool] = ..., texture: _Optional[bytes] = ..., plugin_context: _Optional[bytes] = ..., plugin_identity: _Optional[str] = ..., comment: _Optional[str] = ..., hash: _Optional[str] = ..., comment_hash: _Optional[bytes] = ..., texture_hash: _Optional[bytes] = ..., priority_speaker: _Optional[bool] = ..., recording: _Optional[bool] = ..., temporary_access_tokens: _Optional[_Iterable[str]] = ..., listening_channel_add: _Optional[_Iterable[int]] = ..., listening_channel_remove: _Optional[_Iterable[int]] = ..., listening_volume_adjustment: _Optional[_Iterable[_Union[UserState.VolumeAdjustment, _Mapping]]] = ...) -> None: ...
 
 class BanList(_message.Message):
     __slots__ = ("bans", "query")
@@ -239,7 +239,7 @@ class BanList(_message.Message):
     QUERY_FIELD_NUMBER: _ClassVar[int]
     bans: _containers.RepeatedCompositeFieldContainer[BanList.BanEntry]
     query: bool
-    def __init__(self, bans: _Optional[_Iterable[_Union[BanList.BanEntry, _Mapping]]] = ..., query: bool = ...) -> None: ...
+    def __init__(self, bans: _Optional[_Iterable[_Union[BanList.BanEntry, _Mapping]]] = ..., query: _Optional[bool] = ...) -> None: ...
 
 class TextMessage(_message.Message):
     __slots__ = ("actor", "session", "channel_id", "tree_id", "message")
@@ -319,7 +319,7 @@ class ACL(_message.Message):
         add: _containers.RepeatedScalarFieldContainer[int]
         remove: _containers.RepeatedScalarFieldContainer[int]
         inherited_members: _containers.RepeatedScalarFieldContainer[int]
-        def __init__(self, name: _Optional[str] = ..., inherited: bool = ..., inherit: bool = ..., inheritable: bool = ..., add: _Optional[_Iterable[int]] = ..., remove: _Optional[_Iterable[int]] = ..., inherited_members: _Optional[_Iterable[int]] = ...) -> None: ...
+        def __init__(self, name: _Optional[str] = ..., inherited: _Optional[bool] = ..., inherit: _Optional[bool] = ..., inheritable: _Optional[bool] = ..., add: _Optional[_Iterable[int]] = ..., remove: _Optional[_Iterable[int]] = ..., inherited_members: _Optional[_Iterable[int]] = ...) -> None: ...
     class ChanACL(_message.Message):
         __slots__ = ("apply_here", "apply_subs", "inherited", "user_id", "group", "grant", "deny")
         APPLY_HERE_FIELD_NUMBER: _ClassVar[int]
@@ -336,7 +336,7 @@ class ACL(_message.Message):
         group: str
         grant: int
         deny: int
-        def __init__(self, apply_here: bool = ..., apply_subs: bool = ..., inherited: bool = ..., user_id: _Optional[int] = ..., group: _Optional[str] = ..., grant: _Optional[int] = ..., deny: _Optional[int] = ...) -> None: ...
+        def __init__(self, apply_here: _Optional[bool] = ..., apply_subs: _Optional[bool] = ..., inherited: _Optional[bool] = ..., user_id: _Optional[int] = ..., group: _Optional[str] = ..., grant: _Optional[int] = ..., deny: _Optional[int] = ...) -> None: ...
     CHANNEL_ID_FIELD_NUMBER: _ClassVar[int]
     INHERIT_ACLS_FIELD_NUMBER: _ClassVar[int]
     GROUPS_FIELD_NUMBER: _ClassVar[int]
@@ -347,7 +347,7 @@ class ACL(_message.Message):
     groups: _containers.RepeatedCompositeFieldContainer[ACL.ChanGroup]
     acls: _containers.RepeatedCompositeFieldContainer[ACL.ChanACL]
     query: bool
-    def __init__(self, channel_id: _Optional[int] = ..., inherit_acls: bool = ..., groups: _Optional[_Iterable[_Union[ACL.ChanGroup, _Mapping]]] = ..., acls: _Optional[_Iterable[_Union[ACL.ChanACL, _Mapping]]] = ..., query: bool = ...) -> None: ...
+    def __init__(self, channel_id: _Optional[int] = ..., inherit_acls: _Optional[bool] = ..., groups: _Optional[_Iterable[_Union[ACL.ChanGroup, _Mapping]]] = ..., acls: _Optional[_Iterable[_Union[ACL.ChanACL, _Mapping]]] = ..., query: _Optional[bool] = ...) -> None: ...
 
 class QueryUsers(_message.Message):
     __slots__ = ("ids", "names")
@@ -434,7 +434,7 @@ class VoiceTarget(_message.Message):
         group: str
         links: bool
         children: bool
-        def __init__(self, session: _Optional[_Iterable[int]] = ..., channel_id: _Optional[int] = ..., group: _Optional[str] = ..., links: bool = ..., children: bool = ...) -> None: ...
+        def __init__(self, session: _Optional[_Iterable[int]] = ..., channel_id: _Optional[int] = ..., group: _Optional[str] = ..., links: _Optional[bool] = ..., children: _Optional[bool] = ...) -> None: ...
     ID_FIELD_NUMBER: _ClassVar[int]
     TARGETS_FIELD_NUMBER: _ClassVar[int]
     id: int
@@ -449,7 +449,7 @@ class PermissionQuery(_message.Message):
     channel_id: int
     permissions: int
     flush: bool
-    def __init__(self, channel_id: _Optional[int] = ..., permissions: _Optional[int] = ..., flush: bool = ...) -> None: ...
+    def __init__(self, channel_id: _Optional[int] = ..., permissions: _Optional[int] = ..., flush: _Optional[bool] = ...) -> None: ...
 
 class CodecVersion(_message.Message):
     __slots__ = ("alpha", "beta", "prefer_alpha", "opus")
@@ -461,7 +461,7 @@ class CodecVersion(_message.Message):
     beta: int
     prefer_alpha: bool
     opus: bool
-    def __init__(self, alpha: _Optional[int] = ..., beta: _Optional[int] = ..., prefer_alpha: bool = ..., opus: bool = ...) -> None: ...
+    def __init__(self, alpha: _Optional[int] = ..., beta: _Optional[int] = ..., prefer_alpha: _Optional[bool] = ..., opus: _Optional[bool] = ...) -> None: ...
 
 class UserStats(_message.Message):
     __slots__ = ("session", "stats_only", "certificates", "from_client", "from_server", "udp_packets", "tcp_packets", "udp_ping_avg", "udp_ping_var", "tcp_ping_avg", "tcp_ping_var", "version", "celt_versions", "address", "bandwidth", "onlinesecs", "idlesecs", "strong_certificate", "opus", "rolling_stats")
@@ -525,7 +525,7 @@ class UserStats(_message.Message):
     strong_certificate: bool
     opus: bool
     rolling_stats: UserStats.RollingStats
-    def __init__(self, session: _Optional[int] = ..., stats_only: bool = ..., certificates: _Optional[_Iterable[bytes]] = ..., from_client: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., from_server: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., udp_packets: _Optional[int] = ..., tcp_packets: _Optional[int] = ..., udp_ping_avg: _Optional[float] = ..., udp_ping_var: _Optional[float] = ..., tcp_ping_avg: _Optional[float] = ..., tcp_ping_var: _Optional[float] = ..., version: _Optional[_Union[Version, _Mapping]] = ..., celt_versions: _Optional[_Iterable[int]] = ..., address: _Optional[bytes] = ..., bandwidth: _Optional[int] = ..., onlinesecs: _Optional[int] = ..., idlesecs: _Optional[int] = ..., strong_certificate: bool = ..., opus: bool = ..., rolling_stats: _Optional[_Union[UserStats.RollingStats, _Mapping]] = ...) -> None: ...
+    def __init__(self, session: _Optional[int] = ..., stats_only: _Optional[bool] = ..., certificates: _Optional[_Iterable[bytes]] = ..., from_client: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., from_server: _Optional[_Union[UserStats.Stats, _Mapping]] = ..., udp_packets: _Optional[int] = ..., tcp_packets: _Optional[int] = ..., udp_ping_avg: _Optional[float] = ..., udp_ping_var: _Optional[float] = ..., tcp_ping_avg: _Optional[float] = ..., tcp_ping_var: _Optional[float] = ..., version: _Optional[_Union[Version, _Mapping]] = ..., celt_versions: _Optional[_Iterable[int]] = ..., address: _Optional[bytes] = ..., bandwidth: _Optional[int] = ..., onlinesecs: _Optional[int] = ..., idlesecs: _Optional[int] = ..., strong_certificate: _Optional[bool] = ..., opus: _Optional[bool] = ..., rolling_stats: _Optional[_Union[UserStats.RollingStats, _Mapping]] = ...) -> None: ...
 
 class RequestBlob(_message.Message):
     __slots__ = ("session_texture", "session_comment", "channel_description")
@@ -553,7 +553,7 @@ class ServerConfig(_message.Message):
     image_message_length: int
     max_users: int
     recording_allowed: bool
-    def __init__(self, max_bandwidth: _Optional[int] = ..., welcome_text: _Optional[str] = ..., allow_html: bool = ..., message_length: _Optional[int] = ..., image_message_length: _Optional[int] = ..., max_users: _Optional[int] = ..., recording_allowed: bool = ...) -> None: ...
+    def __init__(self, max_bandwidth: _Optional[int] = ..., welcome_text: _Optional[str] = ..., allow_html: _Optional[bool] = ..., message_length: _Optional[int] = ..., image_message_length: _Optional[int] = ..., max_users: _Optional[int] = ..., recording_allowed: _Optional[bool] = ...) -> None: ...
 
 class SuggestConfig(_message.Message):
     __slots__ = ("version_v1", "version_v2", "positional", "push_to_talk")
@@ -565,7 +565,7 @@ class SuggestConfig(_message.Message):
     version_v2: int
     positional: bool
     push_to_talk: bool
-    def __init__(self, version_v1: _Optional[int] = ..., version_v2: _Optional[int] = ..., positional: bool = ..., push_to_talk: bool = ...) -> None: ...
+    def __init__(self, version_v1: _Optional[int] = ..., version_v2: _Optional[int] = ..., positional: _Optional[bool] = ..., push_to_talk: _Optional[bool] = ...) -> None: ...
 
 class PluginDataTransmission(_message.Message):
     __slots__ = ("senderSession", "receiverSessions", "data", "dataID")
