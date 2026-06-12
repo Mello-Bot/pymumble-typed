@@ -13,6 +13,8 @@ from logging import DEBUG, ERROR, Formatter, StreamHandler, getLogger
 from signal import SIGINT, signal
 from threading import current_thread
 
+from google.protobuf.message import DecodeError
+
 from pymumble_typed import MessageType, UdpMessageType
 from pymumble_typed.blobs import BlobDB
 from pymumble_typed.callbacks import Callbacks
@@ -213,10 +215,18 @@ class Mumble:
                 self._sound_received(udp_packet)
             return
 
-        msg_type = MessageType(_type)
+        try:
+            msg_type = MessageType(_type)
+        except ValueError:
+            self._logger.warning("unknown control message type %d, skipping", _type)
+            return
         MsgClass = getattr(Mumble_pb2, msg_type.name)  # noqa: N806
         packet = MsgClass()
-        packet.ParseFromString(message)
+        try:
+            packet.ParseFromString(message)
+        except DecodeError:
+            self._logger.warning("malformed %s payload, skipping", msg_type.name)
+            return
         match msg_type:
             case MessageType.Version:
                 # FIXME(nico9889): this is a workaround, I didn't consider that the users would change their session ID
