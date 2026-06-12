@@ -49,21 +49,16 @@ class VoiceStack:
 
     def crypt_setup(self, message: CryptSetup):
         self.logger.debug("setting up crypto")
-        self._crypt_lock.acquire(True)
-        if message.key and message.client_nonce and message.server_nonce:
-            self.ocb.set_key(
-                message.key,
-                bytearray(message.client_nonce),
-                bytearray(message.server_nonce)
-            )
-        elif message.server_nonce:
-            self.logger.debug("updating decrypt IV")
-            self.ocb.decrypt_iv = message.server_nonce
-        else:
-            packet = CryptSetup()
-            packet.client_nonce = bytes(self.ocb.encrypt_iv)
-            self.control.send_message(MessageType.CryptSetup, packet)
-        self._crypt_lock.release()
+        with self._crypt_lock:
+            if message.key and message.client_nonce and message.server_nonce:
+                self.ocb.set_key(message.key, bytearray(message.client_nonce), bytearray(message.server_nonce))
+            elif message.server_nonce:
+                self.logger.debug("updating decrypt IV")
+                self.ocb.decrypt_iv = message.server_nonce
+            else:
+                packet = CryptSetup()
+                packet.client_nonce = bytes(self.ocb.encrypt_iv)
+                self.control.send_message(MessageType.CryptSetup, packet)
 
     def signal_protocol_change(self):
         for listener in self._protocol_switch_listeners:
@@ -142,7 +137,8 @@ class VoiceStack:
                 self.logger.error("blockingIOError, packet may will be lost in the next seconds")
                 sleep(1)
         self.logger.warning(
-            f"exiting ListenLoop. Active: {self.active} Exit: {self.exit} Connected: {self.control.is_connected()}")
+            f"exiting ListenLoop. Active: {self.active} Exit: {self.exit} Connected: {self.control.is_connected()}"
+        )
 
     def ping_response(self, ping: Ping):
         if ping.max_bandwidth_per_user:
