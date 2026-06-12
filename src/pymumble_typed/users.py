@@ -170,75 +170,75 @@ class User:
             command = ModUserState(self.session, self_mute=action)
         else:
             command = ModUserState(self.session, mute=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def unmute(self, myself: bool = False):
-        self.mute(myself, False)
+        return self.mute(myself, False)
 
     def deafen(self, myself: bool = False, action: bool = True):
         if self.myself() and myself:
             command = ModUserState(self.session, self_deaf=action)
         else:
             command = ModUserState(self.session, deaf=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def undeafen(self, myself: bool = False):
-        self.deafen(myself, False)
+        return self.deafen(myself, False)
 
     def suppress(self, action: bool = True):
         command = ModUserState(self.session, suppress=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def unsuppress(self):
-        self.suppress(False)
+        return self.suppress(False)
 
     def recording(self, action: bool = True):
         command = ModUserState(self.session, recording=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def unrecording(self):
-        self.recording(False)
+        return self.recording(False)
 
     def set_comment(self, comment: str):
         command = ModUserState(self.session, comment=comment)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def set_texture(self, texture: str):
         command = ModUserState(self.session, texture=texture)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def register(self):  # TODO(nico9889): check if this is correct
         command = ModUserState(self.session, user_id=0)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def update_context(self, context_name: bytes):
         command = ModUserState(self.session, plugin_context=context_name)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def move_in(self, channel: Channel, token: str | None = None):
         if token:
             self._mumble.reauthenticate(token)
         command = Move(self.session, channel.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def send_text_message(self, message: str):
         command = TextPrivateMessage(self._mumble, self.session, message)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def kick(self, permanent: bool = False, reason: str = ""):
         command = RemoveUser(self.session, reason=reason, ban=permanent)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def ban(self, reason: str = ""):
-        self.kick(True, reason)
+        return self.kick(True, reason)
 
     def add_listening_channel(self, channel: Channel):
         command = ModUserState(self.session, listening_channel_add=[channel.id])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def remove_listening_channel(self, channel: Channel):
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def __eq__(self, other: User):
         return self.hash == other.hash

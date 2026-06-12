@@ -121,51 +121,51 @@ class Channel:
         if user is None:
             user = self._mumble.users.myself
         command = Move(user.session, self.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def remove(self):
         command = RemoveChannel(self.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def send_text_message(self, message: str):
         command = TextMessage(self._mumble, self._mumble.users.myself.session, channel_id=self.id, message=message)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def link(self, channels: list[Channel]):
         command = LinkChannel(self.id, add_ids=[channel.id for channel in channels])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def unlink(self, channels: list[Channel]):
         command = UnlinkChannel(self.id, remove_ids=[channel.id for channel in channels])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def unlink_all(self):
         command = UnlinkChannel(self.id, remove_ids=self.links)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def rename(self, name: str):
         command = UpdateChannel(self.id, name=name)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def move(self, parent_id: int):
         command = UpdateChannel(self.id, parent=parent_id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def set_position(self, position: int):
         command = UpdateChannel(self.id, position=position)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def set_max_users(self, max_users: int):
         command = UpdateChannel(self.id, max_users=max_users)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def set_description(self, description: str):
         command = UpdateChannel(self.id, description=description)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def request_acl(self):
         command = QueryACL(self.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def update_acl(self, packet):
         self.acl.update(packet)
@@ -215,8 +215,8 @@ class Channels(dict[int, Channel]):
 
     def new_channel(self, parent_id: int, name: str, temporary: bool = False):
         command = CreateChannel(parent_id, name, temporary)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def remove_channel(self, channel_id: int):
         command = RemoveChannel(channel_id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)

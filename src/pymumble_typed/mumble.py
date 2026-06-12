@@ -7,11 +7,12 @@ if TYPE_CHECKING:
 
 import struct
 import sys
+from concurrent.futures import Future
 from contextlib import suppress
 from enum import IntEnum
 from logging import DEBUG, ERROR, Formatter, StreamHandler, getLogger
 from signal import SIGINT, signal
-from threading import current_thread
+from threading import Lock, current_thread
 
 from google.protobuf.message import DecodeError
 
@@ -20,6 +21,7 @@ from pymumble_typed.blobs import BlobDB
 from pymumble_typed.callbacks import Callbacks
 from pymumble_typed.channels import Channels
 from pymumble_typed.commands import Command, RequestBlobCmd, VoiceTarget
+from pymumble_typed.exceptions import ConnectionLostError, PermissionDeniedError
 from pymumble_typed.messages import Message as MessageContainer
 from pymumble_typed.network import ConnectionRejectedError
 from pymumble_typed.network.control import ControlStack, Status
@@ -47,6 +49,18 @@ class Settings(TypedDict):
 
 
 class Mumble:
+    # Command types the server echoes back as a state change (or rejects with
+    # PermissionDenied); their futures resolve when that reply arrives. Every other
+    # command type gets no confirmation and is resolved immediately (fire-and-forget).
+    _CONFIRMED_TYPES = frozenset(
+        (
+            MessageType.UserState,
+            MessageType.ChannelState,
+            MessageType.ChannelRemove,
+            MessageType.UserRemove,
+        )
+    )
+
     def __init__(
         self,
         host: str,
@@ -67,6 +81,11 @@ class Mumble:
     ):
         super().__init__()
         self._command_limit = 5
+        # Commands awaiting a server state echo (or PermissionDenied), in insertion (FIFO)
+        # order. Guarded by _pending_lock. Only commands whose type the server echoes back
+        # are tracked here; everything else is resolved immediately (see execute_command).
+        self._pending_commands: list[Command] = []
+        self._pending_lock = Lock()
         if tokens is None:
             tokens = []
         self._ready = False
@@ -164,7 +183,7 @@ class Mumble:
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self.voice = VoiceOutput(self._control, self._voice)
-        self._control.set_disconnect_action(lambda: self.callbacks.dispatch("on_disconnect"))
+        self._control.set_disconnect_action(self._handle_disconnect)
         self._ping.set_control(self._control)
         self._ping.set_voice(self._voice)
         self._ping.reset()
@@ -284,17 +303,22 @@ class Mumble:
                     self._callbacks.dispatch("on_connect")
             case MessageType.ChannelRemove:
                 self.channels.remove(packet.channel_id)
+                self._handle_channel_remove_success(packet.channel_id)
             case MessageType.ChannelState:
                 self.channels.handle_update(packet)
+                self._handle_channel_state_success(packet)
             case MessageType.UserRemove:
                 self.users.remove(packet)
+                self._handle_user_remove_success(packet)
             case MessageType.UserState:
                 self.users.handle_update(packet)
+                self._handle_user_state_success(packet.session, packet.actor)
             case MessageType.BanList:
                 pass
             case MessageType.TextMessage:
                 self._callbacks.dispatch("on_message", MessageContainer(self, packet))
             case MessageType.PermissionDenied:
+                self._handle_permission_denied(packet)
                 self._callbacks.dispatch(
                     "on_permission_denied", packet.session, packet.channel_id, packet.name, packet.type, packet.reason
                 )
@@ -398,10 +422,157 @@ class Mumble:
     def is_ready(self):
         self._control.is_ready()
 
-    def execute_command(self, cmd: Command, blocking: bool = True):
+    def execute_command(self, cmd: Command, blocking: bool = True) -> Future:
+        """
+        Enqueue a command and return a Future for its outcome.
+
+        Commands the server echoes back as a state change (``_CONFIRMED_TYPES``) are
+        tracked: their future resolves with the resulting state object when the echo
+        arrives, or raises PermissionDeniedError if the server rejects them (and
+        ConnectionLostError if the connection drops first). Every other command gets no
+        confirmation from the server, so it is sent fire-and-forget and its future is
+        resolved immediately with ``True`` (see docs/async-commands.md for the full list).
+        """
         if blocking:
             self.is_ready()
-        self._control.send_command(cmd)
+        future: Future = Future()
+        cmd.future = future
+        if cmd.type in self._CONFIRMED_TYPES:
+            with self._pending_lock:
+                self._pending_commands.append(cmd)
+            self._control.send_command(cmd)
+        else:
+            # Fire-and-forget: the server sends no reply for this command, so there is
+            # nothing to wait for — resolve as soon as it is enqueued.
+            self._control.send_command(cmd)
+            future.set_result(True)
+        return future
+
+    def _pop_pending(self, predicate) -> Command | None:
+        """Remove and return the first pending command matching ``predicate`` (FIFO)."""
+        with self._pending_lock:
+            for index, pending in enumerate(self._pending_commands):
+                if not pending.future.done() and predicate(pending):
+                    del self._pending_commands[index]
+                    return pending
+        return None
+
+    def _resolve_pending(self, predicate, result) -> None:
+        """Resolve the first pending command matching ``predicate`` with ``result``."""
+        pending = self._pop_pending(predicate)
+        if pending is not None:
+            pending.future.set_result(result)
+
+    def _handle_user_state_success(self, session: int, actor: int):
+        myself = self.users.myself
+        if myself is None or actor != myself.session:
+            return
+        self._resolve_pending(
+            lambda p: p.type == MessageType.UserState and p.target_session == session,
+            self.users.get(session),
+        )
+
+    def _handle_user_remove_success(self, packet):
+        myself = self.users.myself
+        if myself is None or not packet.HasField("actor") or packet.actor != myself.session:
+            return
+        self._resolve_pending(
+            lambda p: p.type == MessageType.UserRemove and p.target_session == packet.session,
+            True,
+        )
+
+    def _handle_channel_state_success(self, packet):
+        def matches(command: Command) -> bool:
+            if command.type != MessageType.ChannelState:
+                return False
+            command_packet = command.packet
+            if command_packet.HasField("channel_id"):
+                return command_packet.channel_id == packet.channel_id
+            # Create: the request has no channel_id, so match on name and, only when the
+            # echo carries it, parent. The server omits parent for some channels (e.g. at
+            # the root), and requiring it would leave the create's future unresolved
+            # rather than handing back the new Channel.
+            if not (command_packet.HasField("name") and packet.HasField("name")):
+                return False
+            if command_packet.name != packet.name:
+                return False
+            if command_packet.HasField("parent") and packet.HasField("parent"):
+                return command_packet.parent == packet.parent
+            return True
+
+        self._resolve_pending(matches, self.channels.get(packet.channel_id))
+
+    def _handle_channel_remove_success(self, channel_id: int):
+        self._resolve_pending(
+            lambda p: p.type == MessageType.ChannelRemove and p.target_channel == channel_id,
+            True,
+        )
+
+    def _handle_permission_denied(self, packet):
+        denied = Mumble_pb2.PermissionDenied
+        # Channel-creation deny types that may carry no channel_id (only confirmed,
+        # tracked commands are matched here, so this is limited to ChannelState).
+        channel_deny_types = (
+            denied.ChannelName,
+            denied.TemporaryChannel,
+            denied.NestingLimit,
+            denied.ChannelCountLimit,
+        )
+
+        def denied_sessions(command: Command) -> tuple[int, ...]:
+            # target_session already covers UserState/UserRemove session fields.
+            return (command.target_session,) if command.target_session is not None else ()
+
+        def denied_channels(command: Command) -> tuple[int, ...]:
+            # target_channel covers the ChannelState/ChannelRemove channel_id; the rest are
+            # the channels only a denial cares about: a create's parent and a move's target.
+            if command.target_channel is not None:
+                return (command.target_channel,)
+            packet_ = command.packet
+            if packet_ is None:
+                return ()
+            if command.type == MessageType.ChannelState and packet_.HasField("parent"):
+                return (packet_.parent,)  # CreateChannel carries parent, not channel_id
+            if command.type == MessageType.UserState and packet_.HasField("channel_id"):
+                return (packet_.channel_id,)  # move destination
+            return ()
+
+        def matches(command: Command) -> bool:
+            if packet.HasField("session") and packet.session in denied_sessions(command):
+                return True
+            if packet.HasField("channel_id") and packet.channel_id in denied_channels(command):
+                return True
+            # Creation denials may carry no channel_id; match by the command kind.
+            if packet.type in channel_deny_types:
+                return command.type == MessageType.ChannelState
+            return False
+
+        # Only tracked (confirmed) commands are matched; fire-and-forget commands have
+        # already resolved, so a denial that matches none simply fires the callback below.
+        pending = self._pop_pending(matches)
+        if pending is not None:
+            channel_id = packet.channel_id if packet.HasField("channel_id") else None
+            session = packet.session if packet.HasField("session") else None
+            pending.future.set_exception(
+                PermissionDeniedError(packet.type, packet.reason, channel_id, session)
+            )
+
+    def _cleanup_pending_commands(self):
+        """
+        Fail every outstanding command future. Called when the connection is lost so
+        callers awaiting confirmation never hang."""
+        with self._pending_lock:
+            pending = self._pending_commands
+            self._pending_commands = []
+        for command in pending:
+            if not command.future.done():
+                command.future.set_exception(
+                    ConnectionLostError("connection lost before the command was confirmed")
+                )
+
+    def _handle_disconnect(self):
+        self._cleanup_pending_commands()
+        self.callbacks.dispatch("on_disconnect")
 
     def get_max_message_length(self) -> int:
         return self.settings["server_max_message_length"]
