@@ -386,9 +386,6 @@ class Mumble:
     def set_application_string(self, string: str):
         self._control.set_application_string(string)
 
-    def set_loop_rate(self, rate: float):
-        self._control.loop_rate = rate
-
     def set_codec_profile(self, profile: CodecProfile):
         self._opus_profile = profile
 
