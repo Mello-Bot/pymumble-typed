@@ -26,10 +26,7 @@ class BlobDB:
             "texture TEXT)"
         )
         self._cursor.execute(
-            "CREATE TABLE IF NOT EXISTS channels ("
-            "channel_id INTEGER PRIMARY KEY,"
-            "description_hash TEXT,"
-            "description TEXT)"
+            "CREATE TABLE IF NOT EXISTS channels (channel_id INTEGER PRIMARY KEY,description_hash TEXT,description TEXT)"
         )
         self._db.commit()
         self._logger.debug("BlobDB initialized")
@@ -43,11 +40,11 @@ class BlobDB:
                 "VALUES(:user_hash,:comment_hash,:comment) "
                 "ON CONFLICT(user_hash) "
                 "DO UPDATE SET comment_hash=:comment_hash, comment=:comment;",
-                {"user_hash": user_hash, "comment_hash": comment_hash, "comment": comment}
+                {"user_hash": user_hash, "comment_hash": comment_hash, "comment": comment},
             )
             self._db.commit()
             self._logger.debug(f"updated user {user_hash} comment: {comment_hash}")
-        except:
+        except sqlite3.Error:
             self._logger.error("Failed to update user comment", exc_info=True)
         self._lock.release()
 
@@ -55,12 +52,11 @@ class BlobDB:
         self._lock.acquire()
         result = None
         try:
-            result = self._cursor.execute("SELECT comment "
-                                          "FROM users "
-                                          "WHERE user_hash=:user_hash",
-                                          {"user_hash": user_hash}).fetchone()
+            result = self._cursor.execute(
+                "SELECT comment FROM users WHERE user_hash=:user_hash", {"user_hash": user_hash}
+            ).fetchone()
 
-        except:
+        except sqlite3.Error:
             self._logger.error("Failed to get user comment", exc_info=True)
         self._lock.release()
         if not result:
@@ -71,11 +67,10 @@ class BlobDB:
         self._lock.acquire()
         try:
             result = self._cursor.execute(
-                "SELECT comment_hash "
-                "FROM users "
-                "WHERE user_hash=:user_hash AND comment_hash=:comment_hash",
-                {"user_hash": user_hash, "comment_hash": comment_hash}).fetchone()
-        except:
+                "SELECT comment_hash FROM users WHERE user_hash=:user_hash AND comment_hash=:comment_hash",
+                {"user_hash": user_hash, "comment_hash": comment_hash},
+            ).fetchone()
+        except sqlite3.Error:
             self._logger.error("Failed to update user comment", exc_info=True)
             result = False
         self._lock.release()
@@ -90,11 +85,11 @@ class BlobDB:
                 "VALUES(:user_hash,:texture_hash,:texture) "
                 "ON CONFLICT(user_hash) "
                 "DO UPDATE SET texture_hash=:texture_hash, texture=:texture;",
-                {"user_hash": user_hash, "texture_hash": texture_hash, "texture": b64encode(texture)}
+                {"user_hash": user_hash, "texture_hash": texture_hash, "texture": b64encode(texture)},
             )
             self._db.commit()
             self._logger.debug(f"updated user {user_hash} texture: {texture_hash}")
-        except:
+        except sqlite3.Error:
             self._logger.error("Failed to update user texture", exc_info=True)
         self._lock.release()
 
@@ -102,15 +97,14 @@ class BlobDB:
         self._lock.acquire()
         result = None
         try:
-            result = self._cursor.execute("SELECT texture "
-                                          "FROM users "
-                                          "WHERE user_hash=:user_hash",
-                                          {"user_hash": user_hash}).fetchone()
-        except:
+            result = self._cursor.execute(
+                "SELECT texture FROM users WHERE user_hash=:user_hash", {"user_hash": user_hash}
+            ).fetchone()
+        except sqlite3.Error:
             self._logger.error("Failed to get user texture", exc_info=True)
         self._lock.release()
         if not result:
-            return b''
+            return b""
         return b64decode(result[0])
 
     def is_user_texture_updated(self, user_hash: str, texture_hash: str) -> bool:
@@ -118,11 +112,10 @@ class BlobDB:
         self._lock.acquire()
         try:
             result = self._cursor.execute(
-                "SELECT texture_hash "
-                "FROM users "
-                "WHERE user_hash=:user_hash AND texture_hash=:texture_hash",
-                {"user_hash": user_hash, "texture_hash": texture_hash}).fetchone()
-        except:
+                "SELECT texture_hash FROM users WHERE user_hash=:user_hash AND texture_hash=:texture_hash",
+                {"user_hash": user_hash, "texture_hash": texture_hash},
+            ).fetchone()
+        except sqlite3.Error:
             self._logger.error("Failed to check user comment", exc_info=True)
             result = False
         self._lock.release()
@@ -137,11 +130,11 @@ class BlobDB:
                 "VALUES(:channel_id,:description_hash,:description) "
                 "ON CONFLICT(channel_id) "
                 "DO UPDATE SET description_hash=:description_hash, description=:description;",
-                {"channel_id": channel_id, "description_hash": description_hash, "description": description}
+                {"channel_id": channel_id, "description_hash": description_hash, "description": description},
             )
             self._db.commit()
             self._logger.debug(f"Updated channel {channel_id} description: {description_hash}")
-        except:
+        except sqlite3.Error:
             self._logger.error("Failed to update channel description", exc_info=True)
         self._lock.release()
 
@@ -149,12 +142,11 @@ class BlobDB:
         self._lock.acquire()
         result = None
         try:
-            result = self._cursor.execute("SELECT description "
-                                          "FROM channels "
-                                          "WHERE channel_id=:channel_id",
-                                          {"channel_id": channel_id}).fetchone()
+            result = self._cursor.execute(
+                "SELECT description FROM channels WHERE channel_id=:channel_id", {"channel_id": channel_id}
+            ).fetchone()
 
-        except:
+        except sqlite3.Error:
             self._logger.error("Failed to update get channel description", exc_info=True)
         self._lock.release()
         if not result:
@@ -168,8 +160,9 @@ class BlobDB:
                 "SELECT description_hash "
                 "FROM channels "
                 "WHERE channel_id=:channel_id AND description_hash=:description_hash",
-                {"channel_id": channel_id, "description_hash": description_hash}).fetchone()
-        except:
+                {"channel_id": channel_id, "description_hash": description_hash},
+            ).fetchone()
+        except sqlite3.Error:
             self._logger.error("Failed to check channel description", exc_info=True)
             result = False
         self._lock.release()
