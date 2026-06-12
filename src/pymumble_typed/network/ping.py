@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from collections.abc import Callable
+
     from pymumble_typed.network.control import ControlStack
     from pymumble_typed.network.voice import VoiceStack
 
