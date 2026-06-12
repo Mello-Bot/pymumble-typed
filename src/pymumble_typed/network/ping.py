@@ -30,9 +30,9 @@ class PingStats:
     def __init__(self):
         self.number: int = 0
 
-        self.average: float = 0.
-        self.average_square: float = 0.
-        self.variance: float = 0.
+        self.average: float = 0.0
+        self.average_square: float = 0.0
+        self.variance: float = 0.0
         self.time_send = time()
         self.last_received: float = 0.0
         self.lost: int = 0
@@ -112,15 +112,12 @@ class Ping:
             self.udp.send()
             self._voice.ping(True, False)
 
-
         if self._voice.check_connection and time() - self._voice.last_good_ping > 15:
             self._voice.active = False
             self._voice.signal_protocol_change()
 
         # If no TCP ping has been received for over 60 seconds, then connection is lost
-        if (self.tcp.time_send != 0 and
-                time() - self.tcp.time_send > 60000 and
-                time() > self.tcp.last_received + 60):
+        if self.tcp.time_send != 0 and time() - self.tcp.time_send > 60000 and time() > self.tcp.last_received + 60:
             self._control.timeout()
             return
         return
