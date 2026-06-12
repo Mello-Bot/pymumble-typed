@@ -33,7 +33,8 @@ class PingStats:
         self.average_square: float = 0.
         self.variance: float = 0.
         self.time_send = time()
-        self.last_received: float = 0.
+        self.last_received: float = 0.0
+        self.lost: int = 0
 
     def send(self):
         self.time_send = time()
