@@ -31,7 +31,7 @@ from pymumble_typed.protobuf.MumbleUDP_pb2 import Ping as UdpPingPacket
 from pymumble_typed.sound import BANDWIDTH, AudioType, CodecNotSupportedError, CodecProfile
 from pymumble_typed.sound.audio import OpusPacket
 from pymumble_typed.sound.voice import VoiceOutput
-from pymumble_typed.tools import VarInt
+from pymumble_typed.tools import InvalidVarIntError, VarInt
 from pymumble_typed.users import Users
 
 
@@ -190,14 +190,17 @@ class Mumble:
                 self._voice.ping_response(packet)
 
     def _dispatch_legacy_voice_message(self, packet: bytes):
-        pos = 0
-        (header,) = struct.unpack("!B", bytes([packet[pos]]))
-        _type = (header & 0b11100000) >> 5
-        target = header & 0b00011111
-        if _type == AudioType.PING:
-            self._voice.ping_legacy_response(packet[1:])
-        else:
-            self._legacy_sound_received(_type, target, packet[1:])
+        try:
+            pos = 0
+            (header,) = struct.unpack("!B", bytes([packet[pos]]))
+            _type = (header & 0b11100000) >> 5
+            target = header & 0b00011111
+            if _type == AudioType.PING:
+                self._voice.ping_legacy_response(packet[1:])
+            else:
+                self._legacy_sound_received(_type, target, packet[1:])
+        except (InvalidVarIntError, struct.error, IndexError):
+            self._logger.warning("dropping malformed legacy voice packet", exc_info=True)
 
     def _dispatch_control_message(self, _type: int, message: bytes):
         try:
