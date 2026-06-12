@@ -57,7 +57,7 @@ class BlobDB:
 
             except sqlite3.Error:
                 self._logger.error("Failed to get user comment", exc_info=True)
-        if not result:
+        if not result or result[0] is None:
             return ""
         return result[0]
 
@@ -98,7 +98,7 @@ class BlobDB:
                 ).fetchone()
             except sqlite3.Error:
                 self._logger.error("Failed to get user texture", exc_info=True)
-        if not result:
+        if not result or result[0] is None:
             return b""
         return b64decode(result[0])
 
@@ -140,7 +140,7 @@ class BlobDB:
 
             except sqlite3.Error:
                 self._logger.error("Failed to update get channel description", exc_info=True)
-        if not result:
+        if not result or result[0] is None:
             return ""
         return result[0]
 
