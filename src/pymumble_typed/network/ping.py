@@ -82,6 +82,9 @@ class Ping:
         self._timer = RepeatTimer(Ping.DELAY, self.send)
 
     def send(self):
+        if not self._control:
+            return
+
         if not self._control.is_connected():
             return
         packet = PingPacket()
@@ -92,14 +95,17 @@ class Ping:
         packet.udp_packets = self.udp.number
         packet.udp_ping_avg = self.udp.average
         packet.udp_ping_var = self.udp.variance
-        packet.good = self._voice.ocb.ui_good
-        packet.late = self._voice.ocb.ui_late
-        packet.lost = self._voice.ocb.ui_lost
 
         # Send a TCP ping
         self.tcp.send()
         self._control.send_message(MessageType.Ping, packet)
 
+        if not self._voice:
+            return
+
+        packet.good = self._voice.ocb.ui_good
+        packet.late = self._voice.ocb.ui_late
+        packet.lost = self._voice.ocb.ui_lost
 
         # Send a UDP ping to check connection
         if self._voice.check_connection:
