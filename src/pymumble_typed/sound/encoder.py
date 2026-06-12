@@ -22,9 +22,8 @@ class Encoder:
         voice.on_protocol_switch(self._recalc_bitrate)
 
     def _update_encoder(self):
-        self._encoder_ready.acquire(blocking=True)
-        self._encoder: OpusEncoder = OpusEncoder(self._sample_rate, self._channels, self._codec_profile)
-        self._encoder_ready.release()
+        with self._encoder_ready:
+            self._encoder: OpusEncoder = OpusEncoder(self._sample_rate, self._channels, self._codec_profile)
 
     def _recalc_bitrate(self, _: bool):
         self._encoder.bitrate = self._calc_bitrate()
@@ -43,13 +42,12 @@ class Encoder:
 
     def encode(self, pcm: bytes) -> bytes:
         if len(pcm) < self._samples:
-            pcm += b'\x00' * (self._samples - len(pcm))
-        self._encoder_ready.acquire(blocking=True)
-        try:
-            encoded = self._encoder.encode(pcm, len(pcm) // self._sample_size)
-        except OpusError:
-            encoded = b''
-        self._encoder_ready.release()
+            pcm += b"\x00" * (self._samples - len(pcm))
+        with self._encoder_ready:
+            try:
+                encoded = self._encoder.encode(pcm, len(pcm) // self._sample_size)
+            except OpusError:
+                encoded = b""
         return encoded
 
     @property
@@ -63,7 +61,7 @@ class Encoder:
     def _calc_bitrate(self):
         overhead_per_packet = 20
         # FIXME(nico9889): ??? self._audio_per_packet == self.encoder_framesize, results 1
-        overhead_per_packet += (3 * int(self._audio_per_packet) / self.encoder_framesize)
+        overhead_per_packet += 3 * int(self._audio_per_packet) / self.encoder_framesize
         if self._voice.active:
             overhead_per_packet += 12
         else:
@@ -88,7 +86,9 @@ class Encoder:
     @audio_per_packet.setter
     def audio_per_packet(self, adp: float):
         if adp not in (0.0025, 0.005, 0.01, 0.02, 0.04, 0.06):
-            raise ValueError(f"Invalid audio frame duration: {adp}. It must be in [0.0025, 0.005, 0.01, 0.02, 0.04, 0.06].")
+            raise ValueError(
+                f"Invalid audio frame duration: {adp}. It must be in [0.0025, 0.005, 0.01, 0.02, 0.04, 0.06]."
+            )
         self._audio_per_packet = adp
         # FIXME(nico9889): this is changing the framesize
         self._calc_samples()
