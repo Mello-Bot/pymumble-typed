@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from pymumble_typed.blobs import BlobDB
     from pymumble_typed.channels import Channel
     from pymumble_typed.mumble import Mumble
@@ -92,6 +94,35 @@ class User:
             self._update_texture()
         else:
             self.texture = self._blob.get_user_texture(self.hash)
+
+    def get_avatar(self) -> Future:
+        """
+        Fetch the user's avatar (Mumble calls it the "texture") and return a Future
+        with the bytes. If the avatar is unset or already cached in BlobDB the Future is
+        resolved immediately; otherwise a RequestBlob is sent and the Future resolves when
+        the server delivers the data in a UserState.
+        """
+        if self._texture_hash and not self._blob.is_user_texture_updated(self.hash, self._texture_hash.hex()):
+            return self._mumble._await_blob(
+                "texture", self.session, RequestBlobCmd(user_texture_hashes=[self.session])
+            )
+        if self._texture_hash:
+            self.texture = self._blob.get_user_texture(self.hash)
+        return self._mumble._resolved_future(self.texture)
+
+    def get_description(self) -> Future:
+        """
+        Fetch the user's description (Mumble calls it the "comment") and return a Future
+        with the string. Resolved immediately if unset or already cached, otherwise when
+        the server delivers it in a UserState.
+        """
+        if self._comment_hash and not self._blob.is_user_comment_updated(self.hash, self._comment_hash.hex()):
+            return self._mumble._await_blob(
+                "comment", self.session, RequestBlobCmd(user_comment_hashes=[self.session])
+            )
+        if self._comment_hash:
+            self.comment = self._blob.get_user_comment(self.hash)
+        return self._mumble._resolved_future(self.comment)
 
     def myself(self):
         return self._users.myself.session == self.session

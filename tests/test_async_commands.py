@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from unittest.mock import MagicMock, patch
 
 from pymumble_typed import MessageType, PermissionDeniedError
-from pymumble_typed.commands import Command, CreateChannel, ModUserState, Move, QueryACL, TextMessage
+from pymumble_typed.commands import Command, CreateChannel, ModUserState, Move, QueryACL, RequestBlobCmd, TextMessage
 from pymumble_typed.mumble import Mumble
 from pymumble_typed.protobuf import Mumble_pb2
 
@@ -226,6 +226,103 @@ class TestAsyncCommands(unittest.TestCase):
         self.assertIsInstance(create_future.exception(), PermissionDeniedError)
         self.assertFalse(mute_future.done())
         self.assertEqual(len(self.mumble._pending_commands), 1)
+
+    # --- blob requests: heavy comment/texture/description fetched on demand ---
+
+    def test_blob_request_sends_request_blob_and_stays_pending(self):
+        future = self.mumble._await_blob("texture", 5, RequestBlobCmd(user_texture_hashes=[5]))
+
+        self.assertFalse(future.done())
+        sent = self.mumble._control.send_command.call_args[0][0]
+        self.assertEqual(sent.type, MessageType.RequestBlob)
+        self.assertEqual(list(sent.packet.session_texture), [5])
+
+    def test_blob_request_resolves_with_user_texture(self):
+        future = self.mumble._await_blob("texture", 5, RequestBlobCmd(user_texture_hashes=[5]))
+        user = MagicMock()
+        user.texture = b"avatar-bytes"
+        self.mumble.users.get.return_value = user
+
+        packet = Mumble_pb2.UserState()
+        packet.session = 5
+        packet.texture = b"avatar-bytes"
+        self.mumble._handle_user_blob(packet)
+
+        self.assertTrue(future.done())
+        self.assertEqual(future.result(), b"avatar-bytes")
+        self.assertEqual(self.mumble._pending_blobs, {})
+
+    def test_blob_request_resolves_with_channel_description(self):
+        future = self.mumble._await_blob("description", 3, RequestBlobCmd(channel_comment_hashes=[3]))
+        channel = MagicMock()
+        channel.description = "the description"
+        self.mumble.channels.get.return_value = channel
+
+        packet = Mumble_pb2.ChannelState()
+        packet.channel_id = 3
+        packet.description = "the description"
+        self.mumble._handle_channel_blob(packet)
+
+        self.assertEqual(future.result(), "the description")
+
+    def test_blob_request_only_resolves_matching_kind(self):
+        # A texture request must not be resolved by a comment delivery for the same user.
+        texture_future = self.mumble._await_blob("texture", 5, RequestBlobCmd(user_texture_hashes=[5]))
+        user = MagicMock()
+        user.comment = "a comment"
+        self.mumble.users.get.return_value = user
+
+        packet = Mumble_pb2.UserState()
+        packet.session = 5
+        packet.comment = "a comment"  # comment only, not texture
+        self.mumble._handle_user_blob(packet)
+
+        self.assertFalse(texture_future.done())
+
+    def test_resolved_future_is_immediate(self):
+        future = self.mumble._resolved_future(b"cached")
+
+        self.assertTrue(future.done())
+        self.assertEqual(future.result(), b"cached")
+
+    def test_blob_request_fails_on_disconnect(self):
+        future = self.mumble._await_blob("comment", 7, RequestBlobCmd(user_comment_hashes=[7]))
+
+        self.mumble._cleanup_pending_commands()
+
+        self.assertTrue(future.done())
+        with self.assertRaises(RuntimeError):
+            future.result()
+        self.assertEqual(self.mumble._pending_blobs, {})
+
+    def test_get_avatar_end_to_end(self):
+        # Real BlobDB and User: first call requests and waits, second call (now cached)
+        # resolves immediately.
+        with patch("pymumble_typed.mumble.ControlStack"), patch("pymumble_typed.mumble.VoiceStack"):
+            mumble = Mumble(host="h", user="u", logger=MagicMock())
+
+        create = Mumble_pb2.UserState()
+        create.session = 5
+        create.hash = "userhash"
+        create.texture_hash = b"\x01\x02"  # has an avatar, but its data is not cached yet
+        mumble._dispatch_control_message(MessageType.UserState, create.SerializeToString())
+        user = mumble.users[5]
+
+        pending = user.get_avatar()
+        self.assertFalse(pending.done())
+
+        deliver = Mumble_pb2.UserState()
+        deliver.session = 5
+        deliver.texture = b"PNGDATA"
+        mumble._dispatch_control_message(MessageType.UserState, deliver.SerializeToString())
+
+        self.assertTrue(pending.done())
+        self.assertEqual(pending.result(), b"PNGDATA")
+
+        # Now cached: a second request resolves immediately without waiting.
+        cached = user.get_avatar()
+        self.assertTrue(cached.done())
+        self.assertEqual(cached.result(), b"PNGDATA")
 
     def test_cleanup_rejects_futures_on_disconnect(self):
         future = self.mumble.execute_command(self._user_state_command(42), blocking=False)

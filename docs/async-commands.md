@@ -121,6 +121,34 @@ the `on_permission_denied` callback.
   awaits are simply garbage-collected (`concurrent.futures.Future` neither logs nor raises
   on an unconsumed result, unlike `asyncio`).
 
+## Blob requests (comments, descriptions, avatars)
+
+User comments/avatars and channel descriptions can be large, so the server sends only
+their **hash** in `UserState`/`ChannelState`. To get the data the client sends a
+`RequestBlob` naming the session/channel; the server replies with a `UserState`/
+`ChannelState` carrying the actual `comment`/`texture`/`description` field, which the state
+layer stores in `BlobDB` (keyed by hash, so unchanged blobs are not refetched).
+
+The same Future model applies, via dedicated `get_` methods (the existing `request_`
+methods are left untouched). Mumble's field names are aliased for clarity:
+
+| Method | Mumble field | Returns |
+|--------|--------------|---------|
+| `User.get_avatar()` | `texture` | `Future[bytes]` |
+| `User.get_description()` | `comment` | `Future[str]` |
+| `Channel.get_description()` | `description` | `Future[str]` |
+
+Each method requests **one** blob for **one** user/channel. If the data for the current
+hash is already in `BlobDB` (or the blob is unset), the Future is resolved **immediately**;
+otherwise a `RequestBlob` is sent and a future is registered in `_pending_blobs`, keyed by
+`(kind, target_id)` — `kind` ∈ `{"texture", "comment", "description"}`, `target_id` the
+session or channel id. When the matching `UserState`/`ChannelState` arrives,
+`_handle_user_blob`/`_handle_channel_blob` resolves the waiting futures with the new value.
+Pending blob futures are failed by the same disconnect cleanup as commands.
+
+> The legacy `blob_greedy_update` prefetch and the `request_*` methods are untouched and
+> will be deprecated in favour of these `get_` methods.
+
 ## Public API
 
 `execute_command(cmd, blocking=True)` now returns a `Future`. Every high-level method in
@@ -128,7 +156,8 @@ the `on_permission_denied` callback.
 `new_channel`, `send_text_message`, ...) propagates that `Future`. This is additive:
 existing callers that ignore the return value keep working unchanged. The result type is
 `Future[Channel]`, `Future[User]`, or `Future[None]`/`Future[bool]` depending on the
-command.
+command. Blob fetches (`get_avatar`/`get_description`) return `Future[bytes]`/`Future[str]`
+as above.
 
 ## Trade-offs and limits
 

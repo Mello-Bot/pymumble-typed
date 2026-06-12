@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from pymumble_typed.blobs import BlobDB
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.protobuf.Mumble_pb2 import ChannelState
@@ -106,6 +108,22 @@ class Channel:
             return
         cmd = RequestBlobCmd(channel_comment_hashes=[self.id])
         self._mumble.execute_command(cmd, False)
+
+    def get_description(self) -> Future:
+        """
+        Fetch the channel's description and return a Future with the string. Resolved
+        immediately if unset or already cached in BlobDB; otherwise a RequestBlob is sent
+        and the Future resolves when the server delivers it in a ChannelState.
+        """
+        if self._description_hash and not self._blob.is_channel_description_updated(
+            self.id, self._description_hash.hex()
+        ):
+            return self._mumble._await_blob(
+                "description", self.id, RequestBlobCmd(channel_comment_hashes=[self.id])
+            )
+        if self._description_hash:
+            self.description = self._blob.get_channel_description(self.id)
+        return self._mumble._resolved_future(self.description)
 
     @property
     def parent(self) -> Channel | None:

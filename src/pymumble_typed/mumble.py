@@ -85,6 +85,10 @@ class Mumble:
         # order. Guarded by _pending_lock. Only commands whose type the server echoes back
         # are tracked here; everything else is resolved immediately (see execute_command).
         self._pending_commands: list[Command] = []
+        # Blob requests awaiting their data, keyed by (kind, target id) where kind is
+        # "texture"/"comment" (user, by session) or "description" (channel, by id). The
+        # data arrives in a later UserState/ChannelState. Guarded by _pending_lock.
+        self._pending_blobs: dict[tuple[str, int], list[Future]] = {}
         self._pending_lock = Lock()
         if tokens is None:
             tokens = []
@@ -307,12 +311,14 @@ class Mumble:
             case MessageType.ChannelState:
                 self.channels.handle_update(packet)
                 self._handle_channel_state_success(packet)
+                self._handle_channel_blob(packet)
             case MessageType.UserRemove:
                 self.users.remove(packet)
                 self._handle_user_remove_success(packet)
             case MessageType.UserState:
                 self.users.handle_update(packet)
                 self._handle_user_state_success(packet.session, packet.actor)
+                self._handle_user_blob(packet)
             case MessageType.BanList:
                 pass
             case MessageType.TextMessage:
@@ -508,6 +514,48 @@ class Mumble:
             True,
         )
 
+    @staticmethod
+    def _resolved_future(value) -> Future:
+        """A Future already resolved with ``value`` (for blobs already cached locally)."""
+        future: Future = Future()
+        future.set_result(value)
+        return future
+
+    def _await_blob(self, kind: str, target_id: int, command: Command) -> Future:
+        """
+        Send a RequestBlob and return a Future resolved when the data arrives in the
+        matching UserState/ChannelState (keyed by ``(kind, target_id)``)."""
+        future: Future = Future()
+        with self._pending_lock:
+            self._pending_blobs.setdefault((kind, target_id), []).append(future)
+        self._control.send_command(command)
+        return future
+
+    def _resolve_blobs(self, kind: str, target_id: int, value):
+        with self._pending_lock:
+            futures = self._pending_blobs.pop((kind, target_id), [])
+        for future in futures:
+            if not future.done():
+                future.set_result(value)
+
+    def _handle_user_blob(self, packet):
+        if not (packet.HasField("comment") or packet.HasField("texture")):
+            return
+        user = self.users.get(packet.session)
+        if user is None:
+            return
+        if packet.HasField("comment"):
+            self._resolve_blobs("comment", packet.session, user.comment)
+        if packet.HasField("texture"):
+            self._resolve_blobs("texture", packet.session, user.texture)
+
+    def _handle_channel_blob(self, packet):
+        if not packet.HasField("description"):
+            return
+        channel = self.channels.get(packet.channel_id)
+        if channel is not None:
+            self._resolve_blobs("description", packet.channel_id, channel.description)
+
     def _handle_permission_denied(self, packet):
         denied = Mumble_pb2.PermissionDenied
         # Channel-creation deny types that may carry no channel_id (only confirmed,
@@ -559,16 +607,21 @@ class Mumble:
 
     def _cleanup_pending_commands(self):
         """
-        Fail every outstanding command future. Called when the connection is lost so
-        callers awaiting confirmation never hang."""
+        Fail every outstanding command and blob future. Called when the connection is lost
+        so callers awaiting confirmation never hang."""
         with self._pending_lock:
             pending = self._pending_commands
             self._pending_commands = []
+            blobs = [future for futures in self._pending_blobs.values() for future in futures]
+            self._pending_blobs = {}
         for command in pending:
             if not command.future.done():
                 command.future.set_exception(
                     ConnectionLostError("connection lost before the command was confirmed")
                 )
+        for future in blobs:
+            if not future.done():
+                future.set_exception(ConnectionLostError("connection lost before the blob arrived"))
 
     def _handle_disconnect(self):
         self._cleanup_pending_commands()
