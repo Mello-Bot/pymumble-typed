@@ -317,7 +317,7 @@ class Mumble:
                 self._handle_user_remove_success(packet)
             case MessageType.UserState:
                 self.users.handle_update(packet)
-                self._handle_user_state_success(packet.session, packet.actor)
+                self._handle_user_state_success(packet)
                 self._handle_user_blob(packet)
             case MessageType.BanList:
                 pass
@@ -469,13 +469,24 @@ class Mumble:
         if pending is not None:
             pending.future.set_result(result)
 
-    def _handle_user_state_success(self, session: int, actor: int):
+    def _handle_user_state_success(self, packet):
         myself = self.users.myself
-        if myself is None or actor != myself.session:
+        if myself is None:
+            return
+        # The server sets `actor` only when the change is made *by another* user (e.g. an
+        # admin moves/mutes us). A user's *own* changes — including our own move_in() or
+        # self-mute — come back with `actor` unset, so a strict `actor == myself` check
+        # would never confirm them and the future would hang until disconnect cleanup.
+        # An absent actor on our own session therefore counts as caused by us, matching
+        # handle_update's `packet.actor or packet.session` convention.
+        caused_by_us = (
+            packet.actor == myself.session if packet.HasField("actor") else packet.session == myself.session
+        )
+        if not caused_by_us:
             return
         self._resolve_pending(
-            lambda p: p.type == MessageType.UserState and p.target_session == session,
-            self.users.get(session),
+            lambda p: p.type == MessageType.UserState and p.target_session == packet.session,
+            self.users.get(packet.session),
         )
 
     def _handle_user_remove_success(self, packet):

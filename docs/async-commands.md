@@ -34,9 +34,11 @@ necessarily heuristic. Three properties make it tractable:
 2. **Content matching.** `session` + changed field (user ops) or `name` + `parent` /
    `channel_id` (channel ops) narrow a reply down to a specific in-flight command.
 3. **The `actor` field.** `UserState` and `UserRemove` carry `actor` — the session of
-   the user who triggered the change. When `actor == myself.session`, the change was
-   caused by us. (`ChannelState` has **no** `actor`, so channel ops rely on content +
-   ordering only.)
+   the user who triggered the change — but **only when the change was made by *another*
+   user** (e.g. an admin moves/mutes us). A user's *own* changes (our `move_in()`,
+   self-mute, ...) come back with `actor` **unset**. So a change was caused by us when
+   `actor == myself.session` *or* `actor` is absent and the affected session is ours.
+   (`ChannelState` has **no** `actor`, so channel ops rely on content + ordering only.)
 
 ## Two kinds of command
 
@@ -83,7 +85,7 @@ state:
 
 | Server message    | Handler                          | Match key                                   | Result               |
 |-------------------|----------------------------------|---------------------------------------------|----------------------|
-| `UserState`       | `_handle_user_state_success`     | `actor == myself` and `session`             | `users.get(session)` |
+| `UserState`       | `_handle_user_state_success`     | caused by us (`actor == myself`, or `actor` unset and `session == myself`) and `session` | `users.get(session)` |
 | `ChannelState`    | `_handle_channel_state_success`  | `channel_id`, or `name`+`parent` (create)   | `channels.get(id)`   |
 | `ChannelRemove`   | `_handle_channel_remove_success` | `channel_id`                                | `True`               |
 | `UserRemove`      | `_handle_user_remove_success`    | `actor == myself` and `session`             | `True`               |

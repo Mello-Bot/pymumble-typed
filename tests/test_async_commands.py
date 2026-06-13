@@ -35,6 +35,13 @@ class TestAsyncCommands(unittest.TestCase):
         cmd.packet.session = session
         return cmd
 
+    def _user_state_echo(self, session, actor=None):
+        packet = Mumble_pb2.UserState()
+        packet.session = session
+        if actor is not None:
+            packet.actor = actor
+        return packet
+
     # --- confirmed commands: tracked until the server echoes or rejects them ---
 
     def test_confirmed_command_is_tracked_and_returns_pending_future(self):
@@ -58,12 +65,42 @@ class TestAsyncCommands(unittest.TestCase):
         self.mumble.users.get.return_value = mock_user
 
         future = self.mumble.execute_command(cmd, blocking=False)
-        # Simulate an incoming UserState update initiated by us (actor = 99)
-        self.mumble._handle_user_state_success(42, 99)
+        # Simulate an incoming UserState update we initiated on another user (actor = 99)
+        self.mumble._handle_user_state_success(self._user_state_echo(42, actor=99))
 
         self.assertTrue(future.done())
         self.assertEqual(future.result(), mock_user)
         self.assertEqual(len(self.mumble._pending_commands), 0)
+
+    def test_self_move_with_absent_actor_resolves_future(self):
+        # move_in() on ourselves: the server echoes a UserState for our own session with
+        # the actor field unset (a user's own changes carry no actor). It must still
+        # resolve, otherwise the future hangs until disconnect cleanup.
+        myself = MagicMock()
+        myself.session = 99
+        self.mumble.users.myself = myself
+        mock_user = MagicMock()
+        self.mumble.users.get.return_value = mock_user
+
+        future = self.mumble.execute_command(self._user_state_command(99), blocking=False)
+        self.mumble._handle_user_state_success(self._user_state_echo(99))  # no actor
+
+        self.assertTrue(future.done())
+        self.assertEqual(future.result(), mock_user)
+        self.assertEqual(len(self.mumble._pending_commands), 0)
+
+    def test_other_user_self_change_does_not_resolve_our_command(self):
+        # Another user changing their own state echoes with no actor and their own
+        # session; it must not resolve a command we issued against that same session.
+        myself = MagicMock()
+        myself.session = 99
+        self.mumble.users.myself = myself
+
+        future = self.mumble.execute_command(self._user_state_command(42), blocking=False)
+        self.mumble._handle_user_state_success(self._user_state_echo(42))  # actor unset
+
+        self.assertFalse(future.done())
+        self.assertEqual(len(self.mumble._pending_commands), 1)
 
     def test_user_state_from_other_actor_does_not_resolve_future(self):
         cmd = self._user_state_command(42)
@@ -73,7 +110,7 @@ class TestAsyncCommands(unittest.TestCase):
 
         future = self.mumble.execute_command(cmd, blocking=False)
         # Another user updated it (actor = 100)
-        self.mumble._handle_user_state_success(42, 100)
+        self.mumble._handle_user_state_success(self._user_state_echo(42, actor=100))
 
         self.assertFalse(future.done())
         self.assertEqual(len(self.mumble._pending_commands), 1)
