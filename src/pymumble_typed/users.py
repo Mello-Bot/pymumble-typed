@@ -337,7 +337,7 @@ class Users(dict[int, User]):
             # FIXME(nico9889): packet.session should be removed and a null actor passed.
             #  It's currently reported back as a self-update to avoid breaking changes
             try:
-                actor = self[packet.actor or packet.session]
+                actor = self[self._mumble._effective_actor(packet)]
             except KeyError:
                 # An unknown actor (e.g. one that already left) must not be mistaken for a
                 # missing user and re-route this update into the creation branch.

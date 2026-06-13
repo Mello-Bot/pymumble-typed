@@ -60,6 +60,17 @@ class Mumble:
             MessageType.UserRemove,
         )
     )
+    # PermissionDenied types for a channel creation that may carry no channel_id; such a
+    # denial is matched by command kind (ChannelState) instead. Only confirmed (tracked)
+    # commands are matched, so this is limited to ChannelState.
+    _CHANNEL_CREATION_DENY_TYPES = frozenset(
+        (
+            Mumble_pb2.PermissionDenied.ChannelName,
+            Mumble_pb2.PermissionDenied.TemporaryChannel,
+            Mumble_pb2.PermissionDenied.NestingLimit,
+            Mumble_pb2.PermissionDenied.ChannelCountLimit,
+        )
+    )
 
     def __init__(
         self,
@@ -454,8 +465,22 @@ class Mumble:
             future.set_result(True)
         return future
 
+    @staticmethod
+    def _effective_actor(packet) -> int:
+        """
+        Session that caused a UserState/UserRemove change. The server sets ``actor`` only
+        when the change is made *by another* user (e.g. an admin moves/mutes us); a user's
+        *own* changes come back with ``actor`` unset, so an absent actor maps back to the
+        affected session.
+        """
+        return packet.actor or packet.session
+
     def _pop_pending(self, predicate) -> Command | None:
         """Remove and return the first pending command matching ``predicate`` (FIFO)."""
+        if not self._pending_commands:
+            # Lock-free fast path: nothing is tracked, so every state message would
+            # otherwise pay a lock acquire + full scan for no reason.
+            return None
         with self._pending_lock:
             for index, pending in enumerate(self._pending_commands):
                 if not pending.future.done() and predicate(pending):
@@ -471,18 +496,10 @@ class Mumble:
 
     def _handle_user_state_success(self, packet):
         myself = self.users.myself
-        if myself is None:
-            return
-        # The server sets `actor` only when the change is made *by another* user (e.g. an
-        # admin moves/mutes us). A user's *own* changes — including our own move_in() or
-        # self-mute — come back with `actor` unset, so a strict `actor == myself` check
-        # would never confirm them and the future would hang until disconnect cleanup.
-        # An absent actor on our own session therefore counts as caused by us, matching
-        # handle_update's `packet.actor or packet.session` convention.
-        caused_by_us = (
-            packet.actor == myself.session if packet.HasField("actor") else packet.session == myself.session
-        )
-        if not caused_by_us:
+        # Our own changes (e.g. move_in() / self-mute) come back with `actor` unset, which
+        # _effective_actor maps back to our session — so they still count as caused by us
+        # instead of hanging until disconnect cleanup.
+        if myself is None or self._effective_actor(packet) != myself.session:
             return
         self._resolve_pending(
             lambda p: p.type == MessageType.UserState and p.target_session == packet.session,
@@ -543,6 +560,8 @@ class Mumble:
         return future
 
     def _resolve_blobs(self, kind: str, target_id: int, value):
+        if not self._pending_blobs:
+            return  # lock-free fast path: no blob fetch is waiting
         with self._pending_lock:
             futures = self._pending_blobs.pop((kind, target_id), [])
         for future in futures:
@@ -568,20 +587,6 @@ class Mumble:
             self._resolve_blobs("description", packet.channel_id, channel.description)
 
     def _handle_permission_denied(self, packet):
-        denied = Mumble_pb2.PermissionDenied
-        # Channel-creation deny types that may carry no channel_id (only confirmed,
-        # tracked commands are matched here, so this is limited to ChannelState).
-        channel_deny_types = (
-            denied.ChannelName,
-            denied.TemporaryChannel,
-            denied.NestingLimit,
-            denied.ChannelCountLimit,
-        )
-
-        def denied_sessions(command: Command) -> tuple[int, ...]:
-            # target_session already covers UserState/UserRemove session fields.
-            return (command.target_session,) if command.target_session is not None else ()
-
         def denied_channels(command: Command) -> tuple[int, ...]:
             # target_channel covers the ChannelState/ChannelRemove channel_id; the rest are
             # the channels only a denial cares about: a create's parent and a move's target.
@@ -597,12 +602,13 @@ class Mumble:
             return ()
 
         def matches(command: Command) -> bool:
-            if packet.HasField("session") and packet.session in denied_sessions(command):
+            # target_session covers the UserState/UserRemove session fields.
+            if packet.HasField("session") and command.target_session == packet.session:
                 return True
             if packet.HasField("channel_id") and packet.channel_id in denied_channels(command):
                 return True
             # Creation denials may carry no channel_id; match by the command kind.
-            if packet.type in channel_deny_types:
+            if packet.type in self._CHANNEL_CREATION_DENY_TYPES:
                 return command.type == MessageType.ChannelState
             return False
 
