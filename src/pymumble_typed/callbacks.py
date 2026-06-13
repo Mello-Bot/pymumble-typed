@@ -79,9 +79,9 @@ class _BoundedPool:
         self._pending = 0
         self._shed = 0
 
-    def submit(self, callback: Callable, args: tuple) -> None:
+    def submit(self, callback: Callable, args: tuple, sheddable: bool = True) -> None:
         with self._lock:
-            if self._pending >= self._limit:
+            if sheddable and self._pending >= self._limit:
                 self._shed += 1
                 # Log on the first shed and then sparsely, to avoid flooding the log
                 # while still surfacing the condition.
@@ -129,22 +129,43 @@ class CallbackDict(TypedDict, total=False):
 
 
 class Callbacks:
-    # Bound on outstanding tasks per pool before new ones are shed. The control bound is
-    # generous (these events are comparatively rare and order-sensitive); the sound bound
-    # is tight because audio is high-rate and dropping a stale frame is preferable to
-    # building an ever-growing backlog.
+    # The control pool runs a SINGLE worker so that order-sensitive state callbacks are
+    # delivered in the order the server produced them. A multi-worker pool distributes
+    # these independent tasks across threads with no ordering guarantee, so an update
+    # could run before the create that registers the entity, leaving the consumer with a
+    # KeyError. Audio stays parallel on its own pool (sized by max_processes).
+    CONTROL_WORKERS = 1
+
+    # Bound on outstanding tasks per pool before sheddable ones are dropped. The control
+    # bound is generous (these events are comparatively rare); the sound bound is tight
+    # because audio is high-rate and dropping a stale frame is preferable to building an
+    # ever-growing backlog.
     MAX_PENDING_CONTROL = 1024
     MAX_PENDING_SOUND = 256
+
+    # State-mutation callbacks are never shed: dropping one leaves every consumer with
+    # permanently inconsistent state (e.g. an update or remove for an entity whose create
+    # was discarded). Unbounded growth under a sustained flood is the lesser evil here.
+    _UNSHEDDABLE: frozenset[CallbackLiteral] = frozenset(
+        (
+            "on_user_created",
+            "on_user_updated",
+            "on_user_removed",
+            "on_channel_created",
+            "on_channel_updated",
+            "on_channel_removed",
+        )
+    )
 
     def __init__(self, client: Mumble):
         self._client = client
         self._logger = client.logger.getChild(self.__class__.__name__)
         self._temp = CallbackDict()
         self._callbacks = CallbackDict()
-        # Control-plane callbacks run on their own pool; high-rate on_sound_received runs
-        # on a dedicated pool so audio bursts can't starve connection/state events
-        # (e.g. on_disconnect) when they share a single worker.
-        self._pool = _BoundedPool(client.max_processes, self.MAX_PENDING_CONTROL, self._logger, "Callback")
+        # Control-plane callbacks run on their own single-worker pool; high-rate
+        # on_sound_received runs on a dedicated parallel pool so audio bursts can't starve
+        # connection/state events (e.g. on_disconnect) when they share a worker.
+        self._pool = _BoundedPool(self.CONTROL_WORKERS, self.MAX_PENDING_CONTROL, self._logger, "Callback")
         self._sound_pool = _BoundedPool(client.max_processes, self.MAX_PENDING_SOUND, self._logger, "SoundCallback")
 
     def dispatch(self, _type: CallbackLiteral, *args):
@@ -153,7 +174,7 @@ class Callbacks:
         except (KeyError, TypeError):
             return
         pool = self._sound_pool if _type == "on_sound_received" else self._pool
-        pool.submit(callback, args)
+        pool.submit(callback, args, sheddable=_type not in self._UNSHEDDABLE)
 
     def disable(self):
         self._callbacks = {}
