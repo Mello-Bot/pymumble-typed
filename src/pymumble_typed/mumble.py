@@ -644,12 +644,13 @@ class Mumble:
     def reauthenticate(self, token):
         self._control.reauthenticate(token)
 
-    def set_whisper(self, target_ids: list[int], channel=False):
+    def set_whisper(self, target_ids: list[int], channel=False) -> Future[bool]:
+        # VoiceTarget is not echoed by the server: fire-and-forget, resolves to True.
         self.voice.target = 1 if channel else 2
         command = VoiceTarget(self.voice.target, target_ids)
-        self.execute_command(command)
+        return self.execute_command(command)
 
-    def remove_whisper(self):
+    def remove_whisper(self) -> Future[bool]:
         self.voice.target = 0
         command = VoiceTarget(self.voice.target, [])
-        self.execute_command(command)
+        return self.execute_command(command)

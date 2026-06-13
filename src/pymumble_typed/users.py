@@ -95,7 +95,7 @@ class User:
         else:
             self.texture = self._blob.get_user_texture(self.hash)
 
-    def get_avatar(self) -> Future:
+    def get_avatar(self) -> Future[bytes]:
         """
         Fetch the user's avatar (Mumble calls it the "texture") and return a Future
         with the bytes. If the avatar is unset or already cached in BlobDB the Future is
@@ -110,7 +110,7 @@ class User:
             self.texture = self._blob.get_user_texture(self.hash)
         return self._mumble._resolved_future(self.texture)
 
-    def get_description(self) -> Future:
+    def get_description(self) -> Future[str]:
         """
         Fetch the user's description (Mumble calls it the "comment") and return a Future
         with the string. Resolved immediately if unset or already cached, otherwise when
@@ -196,78 +196,80 @@ class User:
         cmd = RequestBlobCmd(user_texture_hashes=[self.session])
         self._mumble.execute_command(cmd, False)
 
-    def mute(self, myself: bool = False, action: bool = True):
+    def mute(self, myself: bool = False, action: bool = True) -> Future[User]:
         if self.myself() and myself:
             command = ModUserState(self.session, self_mute=action)
         else:
             command = ModUserState(self.session, mute=action)
         return self._mumble.execute_command(command)
 
-    def unmute(self, myself: bool = False):
+    def unmute(self, myself: bool = False) -> Future[User]:
         return self.mute(myself, False)
 
-    def deafen(self, myself: bool = False, action: bool = True):
+    def deafen(self, myself: bool = False, action: bool = True) -> Future[User]:
         if self.myself() and myself:
             command = ModUserState(self.session, self_deaf=action)
         else:
             command = ModUserState(self.session, deaf=action)
         return self._mumble.execute_command(command)
 
-    def undeafen(self, myself: bool = False):
+    def undeafen(self, myself: bool = False) -> Future[User]:
         return self.deafen(myself, False)
 
-    def suppress(self, action: bool = True):
+    def suppress(self, action: bool = True) -> Future[User]:
         command = ModUserState(self.session, suppress=action)
         return self._mumble.execute_command(command)
 
-    def unsuppress(self):
+    def unsuppress(self) -> Future[User]:
         return self.suppress(False)
 
-    def recording(self, action: bool = True):
+    def recording(self, action: bool = True) -> Future[User]:
         command = ModUserState(self.session, recording=action)
         return self._mumble.execute_command(command)
 
-    def unrecording(self):
+    def unrecording(self) -> Future[User]:
         return self.recording(False)
 
-    def set_comment(self, comment: str):
+    def set_comment(self, comment: str) -> Future[User]:
         command = ModUserState(self.session, comment=comment)
         return self._mumble.execute_command(command)
 
-    def set_texture(self, texture: str):
+    def set_texture(self, texture: str) -> Future[User]:
         command = ModUserState(self.session, texture=texture)
         return self._mumble.execute_command(command)
 
-    def register(self):  # TODO(nico9889): check if this is correct
+    def register(self) -> Future[User]:  # TODO(nico9889): check if this is correct
         command = ModUserState(self.session, user_id=0)
         return self._mumble.execute_command(command)
 
-    def update_context(self, context_name: bytes):
+    def update_context(self, context_name: bytes) -> Future[User]:
         command = ModUserState(self.session, plugin_context=context_name)
         return self._mumble.execute_command(command)
 
-    def move_in(self, channel: Channel, token: str | None = None):
+    def move_in(self, channel: Channel, token: str | None = None) -> Future[User]:
         if token:
             self._mumble.reauthenticate(token)
         command = Move(self.session, channel.id)
         return self._mumble.execute_command(command)
 
-    def send_text_message(self, message: str):
+    def send_text_message(self, message: str) -> Future[bool]:
+        # Text messages are not echoed by the server: fire-and-forget, resolves to True.
         command = TextPrivateMessage(self._mumble, self.session, message)
         return self._mumble.execute_command(command)
 
-    def kick(self, permanent: bool = False, reason: str = ""):
+    def kick(self, permanent: bool = False, reason: str = "") -> Future[bool]:
+        # Resolves to True once the server confirms the UserRemove.
         command = RemoveUser(self.session, reason=reason, ban=permanent)
         return self._mumble.execute_command(command)
 
-    def ban(self, reason: str = ""):
+    def ban(self, reason: str = "") -> Future[bool]:
         return self.kick(True, reason)
 
-    def add_listening_channel(self, channel: Channel):
+    def add_listening_channel(self, channel: Channel) -> Future[User]:
         command = ModUserState(self.session, listening_channel_add=[channel.id])
         return self._mumble.execute_command(command)
 
-    def remove_listening_channel(self, channel: Channel):
+    def remove_listening_channel(self, channel: Channel) -> Future[User]:
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
         return self._mumble.execute_command(command)
 
