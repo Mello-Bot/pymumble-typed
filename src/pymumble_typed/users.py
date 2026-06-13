@@ -321,14 +321,6 @@ class Users(dict[int, User]):
         with self._lock:
             try:
                 user = self[packet.session]
-                # FIXME(nico9889): packet.session should be removed and a null actor passed.
-                #  It's currently reported back as a self-update to avoid breaking changes
-                actor = self[packet.actor or packet.session]
-                before = user.update(packet)
-                # Avoid calling callback if no modification has been registered (like for hashes)
-                if self._mumble.blob_greedy_update and not before:
-                    return
-                self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
             except KeyError:
                 user = User(self._mumble, self._blob, packet)
                 self[packet.session] = user
@@ -336,6 +328,20 @@ class Users(dict[int, User]):
                     self._mumble.callbacks.dispatch("on_user_created", user)
                 else:
                     self._myself = user
+                return
+            # FIXME(nico9889): packet.session should be removed and a null actor passed.
+            #  It's currently reported back as a self-update to avoid breaking changes
+            try:
+                actor = self[packet.actor or packet.session]
+            except KeyError:
+                # An unknown actor (e.g. one that already left) must not be mistaken for a
+                # missing user and re-route this update into the creation branch.
+                actor = user
+            before = user.update(packet)
+            # Avoid calling callback if no modification has been registered (like for hashes)
+            if self._mumble.blob_greedy_update and not before:
+                return
+            self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
 
     def remove(self, packet: UserRemove):
         with self._lock:
