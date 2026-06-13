@@ -249,6 +249,11 @@ class User:
     def move_in(self, channel: Channel, token: str | None = None) -> Future[User]:
         if token:
             self._mumble.reauthenticate(token)
+        if self.channel_id == channel.id:
+            # No-op move: the user is already in the target channel, so the server sends
+            # no UserState echo. Resolve now instead of waiting for a reply that never
+            # comes (which would otherwise hang until disconnect cleanup / a caller timeout).
+            return self._mumble._resolved_future(self)
         command = Move(self.session, channel.id)
         return self._mumble.execute_command(command)
 

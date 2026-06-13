@@ -166,10 +166,16 @@ as above.
 - **No confirmation for fire-and-forget commands.** Their future resolves to `True`
   immediately, so a later server rejection cannot fail it (it reaches the
   `on_permission_denied` callback instead). See the table above for the exact list.
-- **Dropped echoes hang.** A confirmed command that the server, in some edge case, neither
-  echoes nor denies (e.g. a no-op move to the user's current channel) leaves its future
-  pending until disconnect cleanup. There is no wall-clock timeout; this trades a rare hang
-  for not polling the server.
+- **No-op moves are short-circuited.** A move to the channel the user is already in is not
+  echoed by the server (there is nothing to change). `move_in` detects this from local
+  state and resolves the future immediately with the user, rather than tracking a command
+  that would never be confirmed. This matters in practice because Mumble auto-places a
+  registered user into its last channel on reconnect, so a "join your default channel" on
+  connect is frequently already satisfied.
+- **Dropped echoes hang.** A confirmed command that the server, in some other edge case,
+  neither echoes nor denies (e.g. a `ModUserState` that sets a flag already in effect)
+  leaves its future pending until disconnect cleanup. There is no wall-clock timeout; this
+  trades a rare hang for not polling the server.
 - **Create races.** Two clients creating a channel with the same `name`+`parent` at the
   same instant are indistinguishable for `ChannelState` (no `actor`). This is inherent to
   the protocol and is accepted/documented rather than solved.

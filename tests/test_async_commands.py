@@ -361,6 +361,59 @@ class TestAsyncCommands(unittest.TestCase):
         self.assertTrue(cached.done())
         self.assertEqual(cached.result(), b"PNGDATA")
 
+    def _connected_mumble_with_self_in(self, channel_id):
+        # Build a real Mumble whose "myself" user sits in `channel_id`, plus that channel.
+        with patch("pymumble_typed.mumble.ControlStack"), patch("pymumble_typed.mumble.VoiceStack"):
+            mumble = Mumble(host="h", user="u", logger=MagicMock())
+        me = Mumble_pb2.UserState()
+        me.session = 1
+        me.hash = "selfhash"
+        me.channel_id = channel_id
+        mumble._dispatch_control_message(MessageType.UserState, me.SerializeToString())
+        mumble.users.set_myself(1)
+        for cid in {channel_id, channel_id + 1}:
+            cs = Mumble_pb2.ChannelState()
+            cs.channel_id = cid
+            cs.name = f"Channel{cid}"
+            mumble._dispatch_control_message(MessageType.ChannelState, cs.SerializeToString())
+        return mumble
+
+    def test_move_in_to_current_channel_resolves_immediately(self):
+        # A no-op move (the bot is already in the target channel) is never echoed by the
+        # server, so it must resolve immediately and not be left pending.
+        mumble = self._connected_mumble_with_self_in(10)
+        mumble._control.send_command.reset_mock()
+
+        future = mumble.users.myself.move_in(mumble.channels[10])
+
+        self.assertTrue(future.done())
+        self.assertIs(future.result(), mumble.users.myself)
+        self.assertEqual(len(mumble._pending_commands), 0)
+        mumble._control.send_command.assert_not_called()
+
+    def test_channel_move_in_to_current_channel_resolves_immediately(self):
+        # Same no-op short-circuit when moving via Channel.move_in().
+        mumble = self._connected_mumble_with_self_in(10)
+        mumble._control.send_command.reset_mock()
+
+        future = mumble.channels[10].move_in()
+
+        self.assertTrue(future.done())
+        self.assertIs(future.result(), mumble.users.myself)
+        self.assertEqual(len(mumble._pending_commands), 0)
+        mumble._control.send_command.assert_not_called()
+
+    def test_move_in_to_other_channel_is_tracked(self):
+        # A real move (different channel) is still sent and tracked until the echo arrives.
+        mumble = self._connected_mumble_with_self_in(10)
+        mumble._control.send_command.reset_mock()
+
+        future = mumble.users.myself.move_in(mumble.channels[11])
+
+        self.assertFalse(future.done())
+        self.assertEqual(len(mumble._pending_commands), 1)
+        mumble._control.send_command.assert_called_once()
+
     def test_cleanup_rejects_futures_on_disconnect(self):
         future = self.mumble.execute_command(self._user_state_command(42), blocking=False)
         self.assertEqual(len(self.mumble._pending_commands), 1)

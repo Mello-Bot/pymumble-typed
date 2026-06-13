@@ -139,6 +139,10 @@ class Channel:
         # Moves a user into this channel; resolves with the moved User.
         if user is None:
             user = self._mumble.users.myself
+        if user.channel_id == self.id:
+            # No-op move: the user is already in this channel, so the server sends no
+            # UserState echo. Resolve now instead of waiting for a reply that never comes.
+            return self._mumble._resolved_future(user)
         command = Move(user.session, self.id)
         return self._mumble.execute_command(command)
 
