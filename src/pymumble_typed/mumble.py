@@ -105,7 +105,6 @@ class Mumble:
             tokens = []
         self._ready = False
         self._debug = debug
-        self._parent_thread = current_thread()
         formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s: %(message)s")
         handler = StreamHandler(stream=sys.stdout)
         handler.setFormatter(formatter)
@@ -180,6 +179,12 @@ class Mumble:
 
     def start(self):
         self._init()
+        # _listen()/_send() (network/control.py) disconnect once this thread dies, as a
+        # safety net against leaking the connection if the embedding application's owning
+        # thread crashes or exits without calling stop(). start() - not __init__ or connect(),
+        # which loop() also calls internally on every reconnect - is the one call embedders
+        # make from the thread meant to own this client for its whole lifetime.
+        self._control.parent_thread = current_thread()
         self._control.connect()
 
     def _init(self):
