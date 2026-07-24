@@ -113,8 +113,20 @@ class Ping:
             self._voice.ping(True, False)
 
         if self._voice.check_connection and time() - self._voice.last_good_ping > 15:
-            self._voice.active = False
-            self._voice.signal_protocol_change()
+            if self._voice.active:
+                self._control.logger.warning(
+                    "No UDP ping response received in the last 15s, falling back to TCP for voice"
+                )
+                self._voice.active = False
+                self._voice.signal_protocol_change()
+            else:
+                # Already on the TCP fallback: VoiceStack._listen's loop condition includes
+                # `active`, so its listener thread exited the moment we fell back and nothing is
+                # left receiving UDP responses. sync() performs its own bounded receive and calls
+                # enable_udp() (restarting the listener) if a response arrives, so retrying it
+                # here every DELAY seconds is what gives UDP a chance to recover instead of
+                # staying downgraded for the rest of the connection.
+                self._voice.sync()
 
         # If no TCP ping has been received for over 60 seconds, then connection is lost
         if self.tcp.time_send != 0 and time() - self.tcp.time_send > 60000 and time() > self.tcp.last_received + 60:
