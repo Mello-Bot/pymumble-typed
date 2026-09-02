@@ -307,12 +307,14 @@ class ControlStack:
                     self.ping.cancel()
                     self._ready.acquire(True)
                 except OSError as e:
-                    self.logger.error(
-                        f"exception {e} cause exit from control loop. Reconnect: {self.reconnect}")
+                    # %-style, not an f-string: the log record keeps a constant template so
+                    # aggregators (Sentry/GlitchTip) collapse every occurrence into one issue
+                    # instead of one per distinct exception text / backoff value.
+                    self.logger.error("exception %s caused exit from control loop. Reconnect: %s", e, self.reconnect)
                     self.status = Status.FAILED
                 self._on_disconnect()
             if self.reconnect and not self._disconnect:
-                self.logger.error(f"Connection failed. Retrying in {self.backoff} seconds...")
+                self.logger.error("Connection failed. Retrying in %s seconds...", self.backoff)
                 sleep(self.backoff)
         try:
             self.socket.close()
