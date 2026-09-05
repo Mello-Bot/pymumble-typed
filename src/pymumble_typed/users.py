@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from pymumble_typed.blobs import BlobDB
     from pymumble_typed.channels import Channel
     from pymumble_typed.mumble import Mumble
@@ -93,6 +95,35 @@ class User:
         else:
             self.texture = self._blob.get_user_texture(self.hash)
 
+    def get_avatar(self) -> Future[bytes]:
+        """
+        Fetch the user's avatar (Mumble calls it the "texture") and return a Future
+        with the bytes. If the avatar is unset or already cached in BlobDB the Future is
+        resolved immediately; otherwise a RequestBlob is sent and the Future resolves when
+        the server delivers the data in a UserState.
+        """
+        if self._texture_hash and not self._blob.is_user_texture_updated(self.hash, self._texture_hash.hex()):
+            return self._mumble._await_blob(
+                "texture", self.session, RequestBlobCmd(user_texture_hashes=[self.session])
+            )
+        if self._texture_hash:
+            self.texture = self._blob.get_user_texture(self.hash)
+        return self._mumble._resolved_future(self.texture)
+
+    def get_description(self) -> Future[str]:
+        """
+        Fetch the user's description (Mumble calls it the "comment") and return a Future
+        with the string. Resolved immediately if unset or already cached, otherwise when
+        the server delivers it in a UserState.
+        """
+        if self._comment_hash and not self._blob.is_user_comment_updated(self.hash, self._comment_hash.hex()):
+            return self._mumble._await_blob(
+                "comment", self.session, RequestBlobCmd(user_comment_hashes=[self.session])
+            )
+        if self._comment_hash:
+            self.comment = self._blob.get_user_comment(self.hash)
+        return self._mumble._resolved_future(self.comment)
+
     def myself(self):
         return self._users.myself.session == self.session
 
@@ -165,80 +196,87 @@ class User:
         cmd = RequestBlobCmd(user_texture_hashes=[self.session])
         self._mumble.execute_command(cmd, False)
 
-    def mute(self, myself: bool = False, action: bool = True):
+    def mute(self, myself: bool = False, action: bool = True) -> Future[User]:
         if self.myself() and myself:
             command = ModUserState(self.session, self_mute=action)
         else:
             command = ModUserState(self.session, mute=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def unmute(self, myself: bool = False):
-        self.mute(myself, False)
+    def unmute(self, myself: bool = False) -> Future[User]:
+        return self.mute(myself, False)
 
-    def deafen(self, myself: bool = False, action: bool = True):
+    def deafen(self, myself: bool = False, action: bool = True) -> Future[User]:
         if self.myself() and myself:
             command = ModUserState(self.session, self_deaf=action)
         else:
             command = ModUserState(self.session, deaf=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def undeafen(self, myself: bool = False):
-        self.deafen(myself, False)
+    def undeafen(self, myself: bool = False) -> Future[User]:
+        return self.deafen(myself, False)
 
-    def suppress(self, action: bool = True):
+    def suppress(self, action: bool = True) -> Future[User]:
         command = ModUserState(self.session, suppress=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def unsuppress(self):
-        self.suppress(False)
+    def unsuppress(self) -> Future[User]:
+        return self.suppress(False)
 
-    def recording(self, action: bool = True):
+    def recording(self, action: bool = True) -> Future[User]:
         command = ModUserState(self.session, recording=action)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def unrecording(self):
-        self.recording(False)
+    def unrecording(self) -> Future[User]:
+        return self.recording(False)
 
-    def set_comment(self, comment: str):
+    def set_comment(self, comment: str) -> Future[User]:
         command = ModUserState(self.session, comment=comment)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def set_texture(self, texture: str):
+    def set_texture(self, texture: str) -> Future[User]:
         command = ModUserState(self.session, texture=texture)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def register(self):  # TODO(nico9889): check if this is correct
+    def register(self) -> Future[User]:  # TODO(nico9889): check if this is correct
         command = ModUserState(self.session, user_id=0)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def update_context(self, context_name: bytes):
+    def update_context(self, context_name: bytes) -> Future[User]:
         command = ModUserState(self.session, plugin_context=context_name)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def move_in(self, channel: Channel, token: str | None = None):
+    def move_in(self, channel: Channel, token: str | None = None) -> Future[User]:
         if token:
             self._mumble.reauthenticate(token)
+        if self.channel_id == channel.id:
+            # No-op move: the user is already in the target channel, so the server sends
+            # no UserState echo. Resolve now instead of waiting for a reply that never
+            # comes (which would otherwise hang until disconnect cleanup / a caller timeout).
+            return self._mumble._resolved_future(self)
         command = Move(self.session, channel.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def send_text_message(self, message: str):
+    def send_text_message(self, message: str) -> Future[bool]:
+        # Text messages are not echoed by the server: fire-and-forget, resolves to True.
         command = TextPrivateMessage(self._mumble, self.session, message)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def kick(self, permanent: bool = False, reason: str = ""):
+    def kick(self, permanent: bool = False, reason: str = "") -> Future[bool]:
+        # Resolves to True once the server confirms the UserRemove.
         command = RemoveUser(self.session, reason=reason, ban=permanent)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def ban(self, reason: str = ""):
-        self.kick(True, reason)
+    def ban(self, reason: str = "") -> Future[bool]:
+        return self.kick(True, reason)
 
-    def add_listening_channel(self, channel: Channel):
+    def add_listening_channel(self, channel: Channel) -> Future[User]:
         command = ModUserState(self.session, listening_channel_add=[channel.id])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def remove_listening_channel(self, channel: Channel):
+    def remove_listening_channel(self, channel: Channel) -> Future[User]:
         command = ModUserState(self.session, listening_channel_remove=[channel.id])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def __eq__(self, other: User):
         return self.hash == other.hash
@@ -288,14 +326,6 @@ class Users(dict[int, User]):
         with self._lock:
             try:
                 user = self[packet.session]
-                # FIXME(nico9889): packet.session should be removed and a null actor passed.
-                #  It's currently reported back as a self-update to avoid breaking changes
-                actor = self[packet.actor or packet.session]
-                before = user.update(packet)
-                # Avoid calling callback if no modification has been registered (like for hashes)
-                if self._mumble.blob_greedy_update and not before:
-                    return
-                self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
             except KeyError:
                 user = User(self._mumble, self._blob, packet)
                 self[packet.session] = user
@@ -303,6 +333,20 @@ class Users(dict[int, User]):
                     self._mumble.callbacks.dispatch("on_user_created", user)
                 else:
                     self._myself = user
+                return
+            # FIXME(nico9889): packet.session should be removed and a null actor passed.
+            #  It's currently reported back as a self-update to avoid breaking changes
+            try:
+                actor = self[self._mumble._effective_actor(packet)]
+            except KeyError:
+                # An unknown actor (e.g. one that already left) must not be mistaken for a
+                # missing user and re-route this update into the creation branch.
+                actor = user
+            before = user.update(packet)
+            # Avoid calling callback if no modification has been registered (like for hashes)
+            if self._mumble.blob_greedy_update and not before:
+                return
+            self._mumble.callbacks.dispatch("on_user_updated", user, actor, before)
 
     def remove(self, packet: UserRemove):
         with self._lock:

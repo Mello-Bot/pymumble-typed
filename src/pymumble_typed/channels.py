@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from pymumble_typed.blobs import BlobDB
     from pymumble_typed.mumble import Mumble
     from pymumble_typed.protobuf.Mumble_pb2 import ChannelState
@@ -107,6 +109,22 @@ class Channel:
         cmd = RequestBlobCmd(channel_comment_hashes=[self.id])
         self._mumble.execute_command(cmd, False)
 
+    def get_description(self) -> Future[str]:
+        """
+        Fetch the channel's description and return a Future with the string. Resolved
+        immediately if unset or already cached in BlobDB; otherwise a RequestBlob is sent
+        and the Future resolves when the server delivers it in a ChannelState.
+        """
+        if self._description_hash and not self._blob.is_channel_description_updated(
+            self.id, self._description_hash.hex()
+        ):
+            return self._mumble._await_blob(
+                "description", self.id, RequestBlobCmd(channel_comment_hashes=[self.id])
+            )
+        if self._description_hash:
+            self.description = self._blob.get_channel_description(self.id)
+        return self._mumble._resolved_future(self.description)
+
     @property
     def parent(self) -> Channel | None:
         try:
@@ -117,55 +135,63 @@ class Channel:
     def get_users(self) -> list[User]:
         return [user for user in self._mumble.users.values() if user.channel_id == self.id]
 
-    def move_in(self, user: User | None = None):
+    def move_in(self, user: User | None = None) -> Future[User]:
+        # Moves a user into this channel; resolves with the moved User.
         if user is None:
             user = self._mumble.users.myself
+        if user.channel_id == self.id:
+            # No-op move: the user is already in this channel, so the server sends no
+            # UserState echo. Resolve now instead of waiting for a reply that never comes.
+            return self._mumble._resolved_future(user)
         command = Move(user.session, self.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def remove(self):
+    def remove(self) -> Future[bool]:
+        # Resolves to True once the server confirms the ChannelRemove.
         command = RemoveChannel(self.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def send_text_message(self, message: str):
+    def send_text_message(self, message: str) -> Future[bool]:
+        # Text messages are not echoed by the server: fire-and-forget, resolves to True.
         command = TextMessage(self._mumble, self._mumble.users.myself.session, channel_id=self.id, message=message)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def link(self, channels: list[Channel]):
+    def link(self, channels: list[Channel]) -> Future[Channel]:
         command = LinkChannel(self.id, add_ids=[channel.id for channel in channels])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def unlink(self, channels: list[Channel]):
+    def unlink(self, channels: list[Channel]) -> Future[Channel]:
         command = UnlinkChannel(self.id, remove_ids=[channel.id for channel in channels])
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def unlink_all(self):
+    def unlink_all(self) -> Future[Channel]:
         command = UnlinkChannel(self.id, remove_ids=self.links)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def rename(self, name: str):
+    def rename(self, name: str) -> Future[Channel]:
         command = UpdateChannel(self.id, name=name)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def move(self, parent_id: int):
+    def move(self, parent_id: int) -> Future[Channel]:
         command = UpdateChannel(self.id, parent=parent_id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def set_position(self, position: int):
+    def set_position(self, position: int) -> Future[Channel]:
         command = UpdateChannel(self.id, position=position)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def set_max_users(self, max_users: int):
+    def set_max_users(self, max_users: int) -> Future[Channel]:
         command = UpdateChannel(self.id, max_users=max_users)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def set_description(self, description: str):
+    def set_description(self, description: str) -> Future[Channel]:
         command = UpdateChannel(self.id, description=description)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def request_acl(self):
+    def request_acl(self) -> Future[bool]:
+        # The ACL reply arrives via the on_acl_received callback: fire-and-forget here.
         command = QueryACL(self.id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
     def update_acl(self, packet):
         self.acl.update(packet)
@@ -213,10 +239,12 @@ class Channels(dict[int, Channel]):
             except KeyError:
                 self._logger.warning(f"cannot remove channel {channel_id}: channel do not exist")
 
-    def new_channel(self, parent_id: int, name: str, temporary: bool = False):
+    def new_channel(self, parent_id: int, name: str, temporary: bool = False) -> Future[Channel]:
+        # Resolves with the newly created Channel once the server echoes its ChannelState.
         command = CreateChannel(parent_id, name, temporary)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)
 
-    def remove_channel(self, channel_id: int):
+    def remove_channel(self, channel_id: int) -> Future[bool]:
+        # Resolves to True once the server confirms the ChannelRemove.
         command = RemoveChannel(channel_id)
-        self._mumble.execute_command(command)
+        return self._mumble.execute_command(command)

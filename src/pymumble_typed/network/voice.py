@@ -16,7 +16,7 @@ from threading import Lock, Thread
 from time import sleep, time, time_ns
 
 from pymumble_typed import MessageType, UdpMessageType
-from pymumble_typed.crypto.ocb2 import CryptStateOCB2
+from pymumble_typed.crypto.ocb2 import CryptStateOCB2, DecryptFailedError
 from pymumble_typed.network.udp_data import PingData, UDPData
 from pymumble_typed.protobuf.Mumble_pb2 import CryptSetup
 from pymumble_typed.tools import VarInt
@@ -31,6 +31,14 @@ class VoiceStack:
         self.logger = logger.getChild(self.__class__.__name__)
         self.ocb = CryptStateOCB2()
         self.socket = socket(AF_INET, SOCK_DGRAM)
+        # Connect the datagram socket so the kernel only delivers datagrams from the server,
+        # dropping spoofed packets from any other source before they reach recv().
+        self._connected = False
+        try:
+            self.socket.connect(self.addr)
+            self._connected = True
+        except OSError:
+            self.logger.warning(f"could not connect UDP socket to {self.addr}, source filtering disabled", exc_info=True)
         self.control = control
         self.active = False
         self._listen_thread = Thread(target=self._listen, name="VoiceStack:ListenLoop")
@@ -49,21 +57,16 @@ class VoiceStack:
 
     def crypt_setup(self, message: CryptSetup):
         self.logger.debug("setting up crypto")
-        self._crypt_lock.acquire(True)
-        if message.key and message.client_nonce and message.server_nonce:
-            self.ocb.set_key(
-                message.key,
-                bytearray(message.client_nonce),
-                bytearray(message.server_nonce)
-            )
-        elif message.server_nonce:
-            self.logger.debug("updating decrypt IV")
-            self.ocb.decrypt_iv = message.server_nonce
-        else:
-            packet = CryptSetup()
-            packet.client_nonce = bytes(self.ocb.encrypt_iv)
-            self.control.send_message(MessageType.CryptSetup, packet)
-        self._crypt_lock.release()
+        with self._crypt_lock:
+            if message.key and message.client_nonce and message.server_nonce:
+                self.ocb.set_key(message.key, bytearray(message.client_nonce), bytearray(message.server_nonce))
+            elif message.server_nonce:
+                self.logger.debug("updating decrypt IV")
+                self.ocb.decrypt_iv = message.server_nonce
+            else:
+                packet = CryptSetup()
+                packet.client_nonce = bytes(self.ocb.encrypt_iv)
+                self.control.send_message(MessageType.CryptSetup, packet)
 
     def signal_protocol_change(self):
         for listener in self._protocol_switch_listeners:
@@ -115,8 +118,11 @@ class VoiceStack:
             encrypted = self.ocb.encrypt(packet)
             self._crypt_lock.release()
             try:
-                self.socket.sendto(encrypted, self.addr)
-            except (gaierror, TimeoutError):
+                if self._connected:
+                    self.socket.send(encrypted)
+                else:
+                    self.socket.sendto(encrypted, self.addr)
+            except (gaierror, TimeoutError, ConnectionRefusedError):
                 self.logger.error("Exception occurred while sending UDP packet", exc_info=True)
                 if time() - self.control.ping.udp.last_received > 3:
                     self._ping_timeout()
@@ -130,19 +136,32 @@ class VoiceStack:
 
     def _listen(self):
         while self.active and not self.exit and self.control.is_connected():
+            response = None
             try:
                 response = self.socket.recv(512)
-                if response:
-                    decrypted = self.ocb.decrypt(response)
-                    self._dispatcher(decrypted)
-                else:
-                    self.logger.warning("Received UDP empty packet")
-                    self.exit = True
             except BlockingIOError:
                 self.logger.error("blockingIOError, packet may will be lost in the next seconds")
                 sleep(1)
+            except OSError:
+                self.logger.warning("error while receiving UDP packet", exc_info=True)
+
+            if response:
+                try:
+                    decrypted = self.ocb.decrypt(response)
+                    try:
+                        self._dispatcher(decrypted)
+                    except Exception:
+                        self.logger.error("error while dispatching UDP voice packet", exc_info=True)
+                except DecryptFailedError:
+                    # Spoofed or corrupted datagram: drop it and keep the receive loop alive.
+                    self.logger.debug("dropping undecryptable UDP packet")
+            else:
+                self.logger.warning("Received UDP empty packet")
+                self.exit = True
+
         self.logger.warning(
-            f"exiting ListenLoop. Active: {self.active} Exit: {self.exit} Connected: {self.control.is_connected()}")
+            f"exiting ListenLoop. Active: {self.active} Exit: {self.exit} Connected: {self.control.is_connected()}"
+        )
 
     def ping_response(self, ping: Ping):
         if ping.max_bandwidth_per_user:

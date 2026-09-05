@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from collections.abc import Callable
+
     from pymumble_typed.network.control import ControlStack
     from pymumble_typed.network.voice import VoiceStack
 
@@ -29,11 +30,12 @@ class PingStats:
     def __init__(self):
         self.number: int = 0
 
-        self.average: float = 0.
-        self.average_square: float = 0.
-        self.variance: float = 0.
+        self.average: float = 0.0
+        self.average_square: float = 0.0
+        self.variance: float = 0.0
         self.time_send = time()
-        self.last_received: float = 0.
+        self.last_received: float = 0.0
+        self.lost: int = 0
 
     def send(self):
         self.time_send = time()
@@ -80,6 +82,9 @@ class Ping:
         self._timer = RepeatTimer(Ping.DELAY, self.send)
 
     def send(self):
+        if not self._control:
+            return
+
         if not self._control.is_connected():
             return
         packet = PingPacket()
@@ -90,29 +95,41 @@ class Ping:
         packet.udp_packets = self.udp.number
         packet.udp_ping_avg = self.udp.average
         packet.udp_ping_var = self.udp.variance
-        packet.good = self._voice.ocb.ui_good
-        packet.late = self._voice.ocb.ui_late
-        packet.lost = self._voice.ocb.ui_lost
 
         # Send a TCP ping
         self.tcp.send()
         self._control.send_message(MessageType.Ping, packet)
 
+        if not self._voice:
+            return
+
+        packet.good = self._voice.ocb.ui_good
+        packet.late = self._voice.ocb.ui_late
+        packet.lost = self._voice.ocb.ui_lost
 
         # Send a UDP ping to check connection
         if self._voice.check_connection:
             self.udp.send()
             self._voice.ping(True, False)
 
-
         if self._voice.check_connection and time() - self._voice.last_good_ping > 15:
-            self._voice.active = False
-            self._voice.signal_protocol_change()
+            if self._voice.active:
+                self._control.logger.warning(
+                    "No UDP ping response received in the last 15s, falling back to TCP for voice"
+                )
+                self._voice.active = False
+                self._voice.signal_protocol_change()
+            else:
+                # Already on the TCP fallback: VoiceStack._listen's loop condition includes
+                # `active`, so its listener thread exited the moment we fell back and nothing is
+                # left receiving UDP responses. sync() performs its own bounded receive and calls
+                # enable_udp() (restarting the listener) if a response arrives, so retrying it
+                # here every DELAY seconds is what gives UDP a chance to recover instead of
+                # staying downgraded for the rest of the connection.
+                self._voice.sync()
 
         # If no TCP ping has been received for over 60 seconds, then connection is lost
-        if (self.tcp.time_send != 0 and
-                time() - self.tcp.time_send > 60000 and
-                time() > self.tcp.last_received + 60):
+        if self.tcp.time_send != 0 and time() - self.tcp.time_send > 60000 and time() > self.tcp.last_received + 60:
             self._control.timeout()
             return
         return
