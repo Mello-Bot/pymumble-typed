@@ -271,12 +271,18 @@ class User:
 class Users(dict[int, User]):
     def __init__(self, mumble: Mumble, blob: BlobDB):
         super().__init__()
-        self.myself: User | None = None
+        self._myself: User | None = None
         self._mumble = mumble
         self._blob = blob
         self._myself_session = None
         self._lock = Lock()
         self._logger = mumble.logger.getChild(self.__class__.__name__)
+
+    @property
+    def myself(self):
+        if not self._myself:
+            raise RuntimeError("Initialization error: missing bot user")
+        return self._myself
 
     def handle_update(self, packet: UserState):
         with self._lock:
@@ -296,7 +302,7 @@ class Users(dict[int, User]):
                 if packet.session != self._myself_session:
                     self._mumble.callbacks.dispatch("on_user_created", user)
                 else:
-                    self.myself = user
+                    self._myself = user
 
     def remove(self, packet: UserRemove):
         with self._lock:
@@ -314,7 +320,7 @@ class Users(dict[int, User]):
     def set_myself(self, session: int):
         self._myself_session = session
         with suppress(KeyError):
-            self.myself = self[session]
+            self._myself = self[session]
 
     def count(self):
         return len(self)
