@@ -61,6 +61,7 @@ class TestAsyncCommands(unittest.TestCase):
         myself = MagicMock()
         myself.session = 99
         self.mumble.users.myself = myself
+        self.mumble.users.myself_session = myself.session
         mock_user = MagicMock()
         self.mumble.users.get.return_value = mock_user
 
@@ -72,6 +73,16 @@ class TestAsyncCommands(unittest.TestCase):
         self.assertEqual(future.result(), mock_user)
         self.assertEqual(len(self.mumble._pending_commands), 0)
 
+    def test_user_state_before_server_sync_is_ignored(self):
+        # The server sends a UserState per connected user before ServerSync names our
+        # session: those packets must not touch `users.myself`, which raises until then.
+        self.mumble.users.myself_session = None
+        type(self.mumble.users).myself = property(lambda _: self.fail("myself read before sync"))
+
+        self.mumble._handle_user_state_success(self._user_state_echo(42))
+
+        self.assertEqual(len(self.mumble._pending_commands), 0)
+
     def test_self_move_with_absent_actor_resolves_future(self):
         # move_in() on ourselves: the server echoes a UserState for our own session with
         # the actor field unset (a user's own changes carry no actor). It must still
@@ -79,6 +90,7 @@ class TestAsyncCommands(unittest.TestCase):
         myself = MagicMock()
         myself.session = 99
         self.mumble.users.myself = myself
+        self.mumble.users.myself_session = myself.session
         mock_user = MagicMock()
         self.mumble.users.get.return_value = mock_user
 
@@ -95,6 +107,7 @@ class TestAsyncCommands(unittest.TestCase):
         myself = MagicMock()
         myself.session = 99
         self.mumble.users.myself = myself
+        self.mumble.users.myself_session = myself.session
 
         future = self.mumble.execute_command(self._user_state_command(42), blocking=False)
         self.mumble._handle_user_state_success(self._user_state_echo(42))  # actor unset
@@ -107,6 +120,7 @@ class TestAsyncCommands(unittest.TestCase):
         myself = MagicMock()
         myself.session = 99
         self.mumble.users.myself = myself
+        self.mumble.users.myself_session = myself.session
 
         future = self.mumble.execute_command(cmd, blocking=False)
         # Another user updated it (actor = 100)

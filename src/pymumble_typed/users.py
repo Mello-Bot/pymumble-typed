@@ -322,6 +322,11 @@ class Users(dict[int, User]):
             raise RuntimeError("Initialization error: missing bot user")
         return self._myself
 
+    @property
+    def myself_session(self) -> int | None:
+        """Session of the bot, ``None`` until the server sync."""
+        return self._myself_session
+
     def handle_update(self, packet: UserState):
         with self._lock:
             try:

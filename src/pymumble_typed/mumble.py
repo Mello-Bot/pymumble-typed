@@ -500,11 +500,11 @@ class Mumble:
             pending.future.set_result(result)
 
     def _handle_user_state_success(self, packet):
-        myself = self.users.myself
+        myself_session = self.users.myself_session
         # Our own changes (e.g. move_in() / self-mute) come back with `actor` unset, which
         # _effective_actor maps back to our session — so they still count as caused by us
         # instead of hanging until disconnect cleanup.
-        if myself is None or self._effective_actor(packet) != myself.session:
+        if myself_session is None or self._effective_actor(packet) != myself_session:
             return
         self._resolve_pending(
             lambda p: p.type == MessageType.UserState and p.target_session == packet.session,
@@ -512,8 +512,8 @@ class Mumble:
         )
 
     def _handle_user_remove_success(self, packet):
-        myself = self.users.myself
-        if myself is None or not packet.HasField("actor") or packet.actor != myself.session:
+        myself_session = self.users.myself_session
+        if myself_session is None or not packet.HasField("actor") or packet.actor != myself_session:
             return
         self._resolve_pending(
             lambda p: p.type == MessageType.UserRemove and p.target_session == packet.session,
