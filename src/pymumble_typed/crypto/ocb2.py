@@ -1,5 +1,6 @@
 # 1st Source:
 # 2nd Source: https://github.com/ianling/mumpy/blob/dev/mumpy/mumblecrypto.py
+from hmac import compare_digest
 from math import ceil
 from struct import pack, unpack
 from time import time
@@ -42,7 +43,7 @@ class CryptStateOCB2:
     @raw_key.setter
     def raw_key(self, raw_key: bytes):
         if len(raw_key) != AES_KEY_SIZE_BYTES:
-            raise Exception('raw_key has wrong length')
+            raise Exception("raw_key has wrong length")
         self._raw_key = bytes(raw_key)
         self._aes: AES = AES.new(self._raw_key, AES.MODE_ECB)
 
@@ -53,7 +54,7 @@ class CryptStateOCB2:
     @encrypt_iv.setter
     def encrypt_iv(self, encrypt_iv: bytearray):
         if len(encrypt_iv) != AES_BLOCK_SIZE:
-            raise Exception('encrypt_iv wrong length')
+            raise Exception("encrypt_iv wrong length")
         self._encrypt_iv = bytearray(encrypt_iv)
 
     @property
@@ -63,7 +64,7 @@ class CryptStateOCB2:
     @decrypt_iv.setter
     def decrypt_iv(self, decrypt_iv: bytearray):
         if len(decrypt_iv) != AES_BLOCK_SIZE:
-            raise Exception('decrypt_iv wrong length')
+            raise Exception("decrypt_iv wrong length")
         self._decrypt_iv = bytearray(decrypt_iv)
 
     def gen_key(self):
@@ -154,7 +155,7 @@ class CryptStateOCB2:
             self.decrypt_iv = save_iv
             raise DecryptFailedError("Decryption failed")
 
-        if tag[:3] != source[1:4]:
+        if not compare_digest(tag[:3], bytes(source[1:4])):
             self.decrypt_iv = save_iv
             raise DecryptFailedError("Tag didn't match")
 
@@ -173,11 +174,9 @@ class CryptStateOCB2:
 
 
 def S2(block: bytes) -> bytes:
-    ll, uu = unpack('>QQ', block)
+    ll, uu = unpack(">QQ", block)
     carry = ll >> 63
-    return pack('>QQ',
-                 ((ll << 1) | (uu >> 63)) & UINT64_MAX_LIMIT,
-                 ((uu << 1) ^ (carry * 0x87)) & UINT64_MAX_LIMIT)
+    return pack(">QQ", ((ll << 1) | (uu >> 63)) & UINT64_MAX_LIMIT, ((uu << 1) ^ (carry * 0x87)) & UINT64_MAX_LIMIT)
 
 
 def S3(block: bytes) -> bytes:
@@ -192,7 +191,7 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> tupl
     encrypted = bytearray(ceil(len(plain) / AES_BLOCK_SIZE) * AES_BLOCK_SIZE)
     length = len(plain)
     while length > AES_BLOCK_SIZE:
-        block = plain[pos: pos + AES_BLOCK_SIZE]
+        block = plain[pos : pos + AES_BLOCK_SIZE]
         flip_a_bit = False
         if length - AES_BLOCK_SIZE <= AES_BLOCK_SIZE:
             sum_ = 0
@@ -217,18 +216,18 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> tupl
             checksum = bytes(checksum)
             # checksum = xor(checksum, bytes((1,)))  # *reinterpret_cast< unsigned char * >(checksum) ^= 1;
 
-        encrypted[pos: pos + AES_BLOCK_SIZE] = encrypted_block
+        encrypted[pos : pos + AES_BLOCK_SIZE] = encrypted_block
         length -= AES_BLOCK_SIZE
         pos += AES_BLOCK_SIZE
 
     delta = S2(delta)  # S2(delta);
     # ZERO(tmp);
     # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
-    tmp = pack('>QQ', 0, length * 8)
+    tmp = pack(">QQ", 0, length * 8)
 
     tmp = xor(tmp, delta)  # XOR(tmp, tmp, delta);
     pad = aes.encrypt(tmp)  # AESencrypt(tmp, pad, raw_key);
-    tmp = plain[pos:pos + length]
+    tmp = plain[pos : pos + length]
     tmp += pad[length:AES_BLOCK_SIZE]
     checksum = xor(checksum, tmp)  # XOR(checksum, checksum, tmp);
     tmp = xor(pad, tmp)  # XOR(tmp, pad, tmp);
@@ -251,13 +250,13 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
     pos = 0
     while len_plain - pos > AES_BLOCK_SIZE:
         delta = S2(delta)  # S2(delta);
-        encrypted_block = encrypted[pos:pos + AES_BLOCK_SIZE]  # reinterpret_cast< const subblock * >(encrypted)
+        encrypted_block = encrypted[pos : pos + AES_BLOCK_SIZE]  # reinterpret_cast< const subblock * >(encrypted)
         tmp = xor(delta, encrypted_block)  # XOR(tmp, delta, reinterpret_cast< const subblock * >(encrypted));
         tmp = aes.decrypt(tmp)  # AESdecrypt(tmp, tmp, raw_key);
         plain_block = xor(delta, tmp)  # XOR(checksum, checksum, reinterpret_cast< const subblock * >(plain));
         checksum = xor(checksum, plain_block)  # XOR(checksum, checksum, reinterpret_cast< const subblock * >(plain));
 
-        plain[pos:pos + AES_BLOCK_SIZE] = plain_block
+        plain[pos : pos + AES_BLOCK_SIZE] = plain_block
         pos += AES_BLOCK_SIZE
 
     len_remaining = len_plain - pos
@@ -266,7 +265,7 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
 
     # ZERO(tmp);
     # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
-    tmp = pack('>QQ', 0, len_remaining * 8)
+    tmp = pack(">QQ", 0, len_remaining * 8)
 
     tmp = xor(tmp, delta)  # XOR(tmp, tmp, delta);
     pad = aes.encrypt(tmp)  # AESencrypt(tmp, pad, raw_key);
@@ -277,13 +276,13 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
     plain[pos:] = plain_block[:len_remaining]
 
     if not insecure and plain_block[:-1] == delta[:-1]:
-        raise DecryptFailedError('Possibly tampered/able block, discarding.')
+        raise DecryptFailedError("Possibly tampered/able block, discarding.")
 
-    '''
+    """
     delta = S3(delta)  # S3(delta);
     tmp = xor(delta, checksum)  # XOR(tmp, delta, checksum);
     tag = aes.encrypt(tmp)  # AESencrypt(tmp, tag, raw_key);
-    '''
+    """
     delta = S3(delta)
     tag = aes.encrypt(xor(delta, checksum))
 
