@@ -2,7 +2,7 @@
 # 2nd Source: https://github.com/ianling/mumpy/blob/dev/mumpy/mumblecrypto.py
 from hmac import compare_digest
 from math import ceil
-from struct import pack, unpack
+from struct import pack
 from time import time
 
 from Cryptodome.Cipher import AES
@@ -13,6 +13,7 @@ AES_KEY_SIZE_BITS = 128
 AES_KEY_SIZE_BYTES = AES_KEY_SIZE_BITS // 8
 SHIFT_BITS = 63
 UINT64_MAX_LIMIT = (1 << 64) - 1
+UINT128_MAX_LIMIT = (1 << 128) - 1
 
 
 class EncryptFailedError(Exception):
@@ -174,9 +175,10 @@ class CryptStateOCB2:
 
 
 def S2(block: bytes) -> bytes:
-    ll, uu = unpack(">QQ", block)
-    carry = ll >> 63
-    return pack(">QQ", ((ll << 1) | (uu >> 63)) & UINT64_MAX_LIMIT, ((uu << 1) ^ (carry * 0x87)) & UINT64_MAX_LIMIT)
+    # Doubling in GF(2^128) on the block read as one big-endian 128-bit integer: shift left by one and, when the
+    # top bit falls out, fold it back as the 0x87 reduction constant into the low byte.
+    value = int.from_bytes(block, "big")
+    return (((value << 1) & UINT128_MAX_LIMIT) ^ ((value >> 127) * 0x87)).to_bytes(AES_BLOCK_SIZE, "big")
 
 
 def S3(block: bytes) -> bytes:
@@ -305,7 +307,7 @@ def decrement_iv(iv: bytearray, start: int = 0):
 
 
 def xor(a: bytes, b: bytes) -> bytes:
-    a_ = int.from_bytes(a[0:AES_BLOCK_SIZE], byteorder="little")
-    b_ = int.from_bytes(b[0:AES_BLOCK_SIZE], byteorder="little")
-    res = a_ ^ b_
-    return res.to_bytes(byteorder="little", length=AES_BLOCK_SIZE, signed=False)
+    # Positional arguments: the keyword parsing of int.from_bytes/to_bytes costs more than the XOR itself here.
+    return (int.from_bytes(a[0:AES_BLOCK_SIZE], "little") ^ int.from_bytes(b[0:AES_BLOCK_SIZE], "little")).to_bytes(
+        AES_BLOCK_SIZE, "little"
+    )
