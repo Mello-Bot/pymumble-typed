@@ -30,9 +30,14 @@ class PingStats:
     def __init__(self):
         self.number: int = 0
 
+        # Mean and standard deviation of the pings, in milliseconds, over the whole connection: the *_ping_var fields of
+        # the Ping message carry the standard deviation, as the Mumble client does.
         self.average: float = 0.0
-        self.average_square: float = 0.0
-        self.variance: float = 0.0
+        self.deviation: float = 0.0
+        # Sum of the squared distances from the mean (Welford): unlike the mean of the squares minus the squared mean,
+        # it never goes below zero through rounding, which would make sqrt raise.
+        self._squared_distances: float = 0.0
+        self.started = time()
         self.time_send = time()
         self.last_received: float = 0.0
         self.lost: int = 0
@@ -42,15 +47,24 @@ class PingStats:
 
     def update(self, ping: float | None = None):
         self.last_received = time()
-        ping = ping or (self.last_received - self.time_send) * 1000
-        self.average = ((self.average * self.number) + ping) / (self.number + 1)
-        self.average_square = ((self.average_square * self.number) + (ping * ping)) / (self.number + 1)
-        self.variance = sqrt(self.average_square - (self.average * self.average))
+        # A ping of 0.0 is a measure (a clock too coarse for a local round trip), not a missing one.
+        if ping is None:
+            ping = (self.last_received - self.time_send) * 1000
         self.number += 1
+        distance = ping - self.average
+        self.average += distance / self.number
+        self._squared_distances += distance * (ping - self.average)
+        self.deviation = sqrt(self._squared_distances / self.number)
+
+    def silent_for(self) -> float:
+        """Seconds since the last answer, or since the stats started when none came yet."""
+        return time() - (self.last_received or self.started)
 
 
 class Ping:
     DELAY = 10
+    # Seconds without an answer to the TCP pings after which the connection counts as lost.
+    TIMEOUT = 60
 
     def __init__(self):
         self.tcp = PingStats()
@@ -90,11 +104,11 @@ class Ping:
         packet = PingPacket()
         packet.timestamp = int(time())
         packet.tcp_ping_avg = self.tcp.average
-        packet.tcp_ping_var = self.tcp.variance
+        packet.tcp_ping_var = self.tcp.deviation
         packet.tcp_packets = self.tcp.number
         packet.udp_packets = self.udp.number
         packet.udp_ping_avg = self.udp.average
-        packet.udp_ping_var = self.udp.variance
+        packet.udp_ping_var = self.udp.deviation
 
         # Send a TCP ping
         self.tcp.send()
@@ -129,7 +143,5 @@ class Ping:
                 self._voice.sync()
 
         # If no TCP ping has been received for over 60 seconds, then connection is lost
-        if self.tcp.time_send != 0 and time() - self.tcp.time_send > 60000 and time() > self.tcp.last_received + 60:
+        if self.tcp.silent_for() > Ping.TIMEOUT:
             self._control.timeout()
-            return
-        return
