@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from google.protobuf.message import Message
 
     from pymumble_typed.mumble import Mumble
@@ -18,6 +20,27 @@ class Command:
     def __init__(self):
         self.type: MessageType = MessageType.Ping
         self.packet: Message | None = None
+        # Set by Mumble.execute_command: the future handed back to the caller, resolved
+        # when the server confirms the command (or immediately for fire-and-forget ones).
+        self.future: Future | None = None
+
+    @property
+    def target_session(self) -> int | None:
+        """Session this command targets, for ``UserState``/``UserRemove`` commands."""
+        if self.type in (MessageType.UserState, MessageType.UserRemove) and (
+            self.packet is not None and self.packet.HasField("session")
+        ):
+            return self.packet.session
+        return None
+
+    @property
+    def target_channel(self) -> int | None:
+        """Channel this command targets, for ``ChannelState``/``ChannelRemove`` commands."""
+        if self.type in (MessageType.ChannelState, MessageType.ChannelRemove) and (
+            self.packet is not None and self.packet.HasField("channel_id")
+        ):
+            return self.packet.channel_id
+        return None
 
     def __str__(self):
         return repr(self)

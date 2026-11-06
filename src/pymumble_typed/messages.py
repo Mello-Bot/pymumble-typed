@@ -29,10 +29,14 @@ class Message:
             self.author: User | None = mumble.users[message.actor]
         except KeyError:
             self.author: User | None = None
-        try:
-            self.channel: Channel | None = mumble.channels[message.channel_id.pop()]
-        except KeyError:
-            self.channel: Channel | None = None
-        except IndexError:
-            self.channel = None
+        # Targets as sent by the server: sessions addressed directly (a private message), channels, and channel trees
+        # (a recursive message). Targets unknown to the local state are left out.
+        self.sessions: list[int] = list(message.session)
+        self.channels: list[Channel] = [
+            mumble.channels[channel_id] for channel_id in message.channel_id if channel_id in mumble.channels
+        ]
+        self.trees: list[Channel] = [
+            mumble.channels[tree_id] for tree_id in message.tree_id if tree_id in mumble.channels
+        ]
+        self.channel: Channel | None = self.channels[0] if self.channels else None
         self.content: str = message.message

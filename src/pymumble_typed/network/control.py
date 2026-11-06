@@ -18,7 +18,7 @@ from queue import Empty, Queue
 from socket import AF_UNSPEC, SOCK_STREAM, getaddrinfo, socket
 from ssl import PROTOCOL_TLSv1, PROTOCOL_TLSv1_2, SSLContext, SSLEOFError, SSLError
 from struct import pack, unpack
-from threading import Lock, Thread, current_thread
+from threading import Lock, Thread
 from time import sleep
 
 from pymumble_typed import MessageType
@@ -70,7 +70,11 @@ class ControlStack:
         self._voice_dispatcher: Callable[[AudioData], None] = self.send_audio_legacy
         self.ping = ping
         self.backoff = 1
-        self.parent_thread = current_thread()
+        # Set by Mumble.start(), not here: __init__ runs on whatever thread constructs this
+        # object, which may not be the thread the embedder intends to "own" the connection
+        # (e.g. a short-lived setup thread). _listen()/_send() disconnect once this thread is
+        # no longer alive, so it must reflect the thread that actually starts the connection.
+        self.parent_thread: Thread | None = None
 
     def reinit(self) -> ControlStack:
         self.disconnect()

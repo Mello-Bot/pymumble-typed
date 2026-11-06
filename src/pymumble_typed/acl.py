@@ -74,17 +74,16 @@ class ACL:
         self._lock = Lock()
 
     def update(self, packet: ACLPacket):
-        self._lock.acquire()
-        self.inherit_acls = bool(packet.inherit_acls)
-        for group in packet.groups:
-            try:
-                self.groups[group.name].update(group)
-            except KeyError:
-                self.groups[group.name] = ChannelGroup(group)
+        with self._lock:
+            self.inherit_acls = bool(packet.inherit_acls)
+            for group in packet.groups:
+                try:
+                    self.groups[group.name].update(group)
+                except KeyError:
+                    self.groups[group.name] = ChannelGroup(group)
 
-        for acl in packet.acls:
-            try:
-                self.acls[acl.group].update(acl)
-            except KeyError:
-                self.groups[acl.group] = ChannelACL(acl)
-        self._lock.release()
+            for acl in packet.acls:
+                try:
+                    self.acls[acl.group].update(acl)
+                except KeyError:
+                    self.groups[acl.group] = ChannelACL(acl)

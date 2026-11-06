@@ -1,7 +1,8 @@
 # 1st Source:
 # 2nd Source: https://github.com/ianling/mumpy/blob/dev/mumpy/mumblecrypto.py
+from hmac import compare_digest
 from math import ceil
-from struct import pack, unpack
+from struct import pack
 from time import time
 
 from Cryptodome.Cipher import AES
@@ -12,6 +13,7 @@ AES_KEY_SIZE_BITS = 128
 AES_KEY_SIZE_BYTES = AES_KEY_SIZE_BITS // 8
 SHIFT_BITS = 63
 UINT64_MAX_LIMIT = (1 << 64) - 1
+UINT128_MAX_LIMIT = (1 << 128) - 1
 
 
 class EncryptFailedError(Exception):
@@ -42,7 +44,7 @@ class CryptStateOCB2:
     @raw_key.setter
     def raw_key(self, raw_key: bytes):
         if len(raw_key) != AES_KEY_SIZE_BYTES:
-            raise Exception('raw_key has wrong length')
+            raise Exception("raw_key has wrong length")
         self._raw_key = bytes(raw_key)
         self._aes: AES = AES.new(self._raw_key, AES.MODE_ECB)
 
@@ -53,7 +55,7 @@ class CryptStateOCB2:
     @encrypt_iv.setter
     def encrypt_iv(self, encrypt_iv: bytearray):
         if len(encrypt_iv) != AES_BLOCK_SIZE:
-            raise Exception('encrypt_iv wrong length')
+            raise Exception("encrypt_iv wrong length")
         self._encrypt_iv = bytearray(encrypt_iv)
 
     @property
@@ -63,7 +65,7 @@ class CryptStateOCB2:
     @decrypt_iv.setter
     def decrypt_iv(self, decrypt_iv: bytearray):
         if len(decrypt_iv) != AES_BLOCK_SIZE:
-            raise Exception('decrypt_iv wrong length')
+            raise Exception("decrypt_iv wrong length")
         self._decrypt_iv = bytearray(decrypt_iv)
 
     def gen_key(self):
@@ -154,7 +156,7 @@ class CryptStateOCB2:
             self.decrypt_iv = save_iv
             raise DecryptFailedError("Decryption failed")
 
-        if tag[:3] != source[1:4]:
+        if not compare_digest(tag[:3], bytes(source[1:4])):
             self.decrypt_iv = save_iv
             raise DecryptFailedError("Tag didn't match")
 
@@ -173,11 +175,10 @@ class CryptStateOCB2:
 
 
 def S2(block: bytes) -> bytes:
-    ll, uu = unpack('>QQ', block)
-    carry = ll >> 63
-    return pack('>QQ',
-                 ((ll << 1) | (uu >> 63)) & UINT64_MAX_LIMIT,
-                 ((uu << 1) ^ (carry * 0x87)) & UINT64_MAX_LIMIT)
+    # Doubling in GF(2^128) on the block read as one big-endian 128-bit integer: shift left by one and, when the
+    # top bit falls out, fold it back as the 0x87 reduction constant into the low byte.
+    value = int.from_bytes(block, "big")
+    return (((value << 1) & UINT128_MAX_LIMIT) ^ ((value >> 127) * 0x87)).to_bytes(AES_BLOCK_SIZE, "big")
 
 
 def S3(block: bytes) -> bytes:
@@ -191,8 +192,13 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> tupl
     pos = 0
     encrypted = bytearray(ceil(len(plain) / AES_BLOCK_SIZE) * AES_BLOCK_SIZE)
     length = len(plain)
+    # The AES inputs of the full blocks and of the final pad depend only on the plaintext and on the delta chain, never
+    # on an earlier AES output: they are gathered and encrypted with one call. The cipher is in ECB mode, so encrypting
+    # the concatenation is block-wise identical to encrypting each block on its own.
+    deltas = []
+    flip_pos = -1
     while length > AES_BLOCK_SIZE:
-        block = plain[pos: pos + AES_BLOCK_SIZE]
+        block = plain[pos : pos + AES_BLOCK_SIZE]
         flip_a_bit = False
         if length - AES_BLOCK_SIZE <= AES_BLOCK_SIZE:
             sum_ = 0
@@ -201,34 +207,39 @@ def ocb_encrypt(aes: AES, plain: bytes, nonce: bytes, *, insecure=False) -> tupl
             flip_a_bit = not insecure and sum_ == 0
 
         delta = S2(delta)  # S2(delta);
-        tmp = xor(delta, block)  # XOR(tmp, delta, reinterpret_cast< const subblock * >(plain));
-        if flip_a_bit:
-            tmp = bytearray(tmp)
-            tmp[-1] = tmp[-1] ^ 1
-            tmp = bytes(tmp)
-            # tmp = xor(tmp, bytes((1,)))
-
-        tmp = aes.encrypt(tmp)  # AESencrypt(tmp, tmp, raw_key);
-        encrypted_block = xor(delta, tmp)  # XOR(reinterpret_cast< subblock * >(encrypted), delta, tmp);
+        deltas.append(delta)
         checksum = xor(checksum, block)  # XOR(checksum, checksum, reinterpret_cast< const subblock * >(plain));
         if flip_a_bit:
+            flip_pos = pos + AES_BLOCK_SIZE - 1
             checksum = bytearray(checksum)
             checksum[-1] = checksum[-1] ^ 1
             checksum = bytes(checksum)
             # checksum = xor(checksum, bytes((1,)))  # *reinterpret_cast< unsigned char * >(checksum) ^= 1;
 
-        encrypted[pos: pos + AES_BLOCK_SIZE] = encrypted_block
         length -= AES_BLOCK_SIZE
         pos += AES_BLOCK_SIZE
+
+    # XOR(tmp, delta, reinterpret_cast< const subblock * >(plain)) of every full block, in one go: XOR is byte-wise.
+    all_deltas = b"".join(deltas)
+    inputs = bytearray(
+        (int.from_bytes(all_deltas, "little") ^ int.from_bytes(plain[0:pos], "little")).to_bytes(pos, "little")
+    )
+    if flip_pos >= 0:
+        inputs[flip_pos] ^= 1
 
     delta = S2(delta)  # S2(delta);
     # ZERO(tmp);
     # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
-    tmp = pack('>QQ', 0, length * 8)
+    tmp = pack(">QQ", 0, length * 8)
 
-    tmp = xor(tmp, delta)  # XOR(tmp, tmp, delta);
-    pad = aes.encrypt(tmp)  # AESencrypt(tmp, pad, raw_key);
-    tmp = plain[pos:pos + length]
+    inputs += xor(tmp, delta)  # XOR(tmp, tmp, delta);
+    outputs = aes.encrypt(inputs)  # AESencrypt(tmp, tmp, raw_key); for every block, then AESencrypt(tmp, pad, raw_key);
+    # XOR(reinterpret_cast< subblock * >(encrypted), delta, tmp); of every full block.
+    encrypted[0:pos] = (int.from_bytes(all_deltas, "little") ^ int.from_bytes(outputs[0:pos], "little")).to_bytes(
+        pos, "little"
+    )
+    pad = outputs[pos:]
+    tmp = plain[pos : pos + length]
     tmp += pad[length:AES_BLOCK_SIZE]
     checksum = xor(checksum, tmp)  # XOR(checksum, checksum, tmp);
     tmp = xor(pad, tmp)  # XOR(tmp, pad, tmp);
@@ -249,16 +260,25 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
 
     plain = bytearray(len_plain)
     pos = 0
+    # The AES inputs of the full blocks depend only on the ciphertext and on the delta chain: they are gathered and
+    # decrypted with one call. The cipher is in ECB mode, so decrypting the concatenation is block-wise identical to
+    # decrypting each block on its own.
+    deltas = []
     while len_plain - pos > AES_BLOCK_SIZE:
         delta = S2(delta)  # S2(delta);
-        encrypted_block = encrypted[pos:pos + AES_BLOCK_SIZE]  # reinterpret_cast< const subblock * >(encrypted)
-        tmp = xor(delta, encrypted_block)  # XOR(tmp, delta, reinterpret_cast< const subblock * >(encrypted));
-        tmp = aes.decrypt(tmp)  # AESdecrypt(tmp, tmp, raw_key);
-        plain_block = xor(delta, tmp)  # XOR(checksum, checksum, reinterpret_cast< const subblock * >(plain));
-        checksum = xor(checksum, plain_block)  # XOR(checksum, checksum, reinterpret_cast< const subblock * >(plain));
-
-        plain[pos:pos + AES_BLOCK_SIZE] = plain_block
+        deltas.append(delta)
         pos += AES_BLOCK_SIZE
+
+    if pos:
+        all_deltas = int.from_bytes(b"".join(deltas), "little")
+        # XOR(tmp, delta, reinterpret_cast< const subblock * >(encrypted)); of every full block: XOR is byte-wise.
+        inputs = (all_deltas ^ int.from_bytes(encrypted[0:pos], "little")).to_bytes(pos, "little")
+        outputs = aes.decrypt(inputs)  # AESdecrypt(tmp, tmp, raw_key); of every full block.
+        # XOR(reinterpret_cast< subblock * >(plain), delta, tmp); of every full block.
+        plain[0:pos] = (all_deltas ^ int.from_bytes(outputs, "little")).to_bytes(pos, "little")
+        for block_pos in range(0, pos, AES_BLOCK_SIZE):
+            # XOR(checksum, checksum, reinterpret_cast< const subblock * >(plain));
+            checksum = xor(checksum, plain[block_pos : block_pos + AES_BLOCK_SIZE])
 
     len_remaining = len_plain - pos
 
@@ -266,7 +286,7 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
 
     # ZERO(tmp);
     # tmp[BLOCKSIZE - 1] = SWAPPED(len * 8);
-    tmp = pack('>QQ', 0, len_remaining * 8)
+    tmp = pack(">QQ", 0, len_remaining * 8)
 
     tmp = xor(tmp, delta)  # XOR(tmp, tmp, delta);
     pad = aes.encrypt(tmp)  # AESencrypt(tmp, pad, raw_key);
@@ -277,13 +297,13 @@ def ocb_decrypt(aes: AES, encrypted: bytes, nonce: bytes, len_plain: int, *, ins
     plain[pos:] = plain_block[:len_remaining]
 
     if not insecure and plain_block[:-1] == delta[:-1]:
-        raise DecryptFailedError('Possibly tampered/able block, discarding.')
+        raise DecryptFailedError("Possibly tampered/able block, discarding.")
 
-    '''
+    """
     delta = S3(delta)  # S3(delta);
     tmp = xor(delta, checksum)  # XOR(tmp, delta, checksum);
     tag = aes.encrypt(tmp)  # AESencrypt(tmp, tag, raw_key);
-    '''
+    """
     delta = S3(delta)
     tag = aes.encrypt(xor(delta, checksum))
 
@@ -306,7 +326,7 @@ def decrement_iv(iv: bytearray, start: int = 0):
 
 
 def xor(a: bytes, b: bytes) -> bytes:
-    a_ = int.from_bytes(a[0:AES_BLOCK_SIZE], byteorder="little")
-    b_ = int.from_bytes(b[0:AES_BLOCK_SIZE], byteorder="little")
-    res = a_ ^ b_
-    return res.to_bytes(byteorder="little", length=AES_BLOCK_SIZE, signed=False)
+    # Positional arguments: the keyword parsing of int.from_bytes/to_bytes costs more than the XOR itself here.
+    return (int.from_bytes(a[0:AES_BLOCK_SIZE], "little") ^ int.from_bytes(b[0:AES_BLOCK_SIZE], "little")).to_bytes(
+        AES_BLOCK_SIZE, "little"
+    )

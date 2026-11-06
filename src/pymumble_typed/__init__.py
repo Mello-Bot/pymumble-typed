@@ -33,3 +33,9 @@ class MessageType(IntEnum):
 class UdpMessageType(IntEnum):
     Audio = 0
     Ping = 1
+
+
+# Re-exported here so users can `from pymumble_typed import PermissionDeniedError`.
+from pymumble_typed.exceptions import ConnectionLostError, PermissionDeniedError  # noqa: E402
+
+__all__ = ["ConnectionLostError", "MessageType", "PermissionDeniedError", "UdpMessageType"]
