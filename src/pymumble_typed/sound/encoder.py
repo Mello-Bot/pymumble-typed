@@ -8,25 +8,43 @@ from pymumble_typed.sound import AUDIO_PER_PACKET, BANDWIDTH, CHANNELS, SAMPLE_R
 
 
 class Encoder:
-    def __init__(self, voice: VoiceStack):
+    def __init__(self, voice: VoiceStack, channels: int = CHANNELS, codec_profile: CodecProfile = CodecProfile.Audio):
+        self._check_channels(channels)
         self._audio_per_packet: float = AUDIO_PER_PACKET
         self._sample_rate: int = SAMPLE_RATE
-        self._channels: int = CHANNELS
-        self._sample_size = self._channels * 2
-        self._codec_profile: CodecProfile = CodecProfile.Audio
-        self._encoder: OpusEncoder = OpusEncoder(self._sample_rate, self._channels, self._codec_profile)
+        self._channels: int = channels
+        self._codec_profile: CodecProfile = codec_profile
         self._bandwidth: int = BANDWIDTH
-        self._samples = int(self.encoder_framesize * self._sample_rate * self.sample_size)
-        self._encoder_ready = Lock()
+        self._sample_size: int = 0
+        self._samples: int = 0
         self._voice = voice
+        # Guards the Opus encoder and the frame sizes encode() reads: the setters may run on another thread
+        # while the audio is being encoded.
+        self._encoder_ready = Lock()
+        self._calc_samples()
+        self._encoder: OpusEncoder = self._build_encoder()
         voice.on_protocol_switch(self._recalc_bitrate)
+
+    @staticmethod
+    def _check_channels(channels: int):
+        if channels not in (1, 2):
+            raise ValueError("Invalid number of channels")
+
+    def _build_encoder(self) -> OpusEncoder:
+        # The channel count, sample rate and application of an Opus encoder are fixed at creation: changing them
+        # needs a new encoder, which starts from the default bitrate, so the configured one is applied again.
+        encoder = OpusEncoder(self._sample_rate, self._channels, self._codec_profile)
+        encoder.bitrate = self._calc_bitrate()
+        return encoder
 
     def _update_encoder(self):
         with self._encoder_ready:
-            self._encoder: OpusEncoder = OpusEncoder(self._sample_rate, self._channels, self._codec_profile)
+            self._calc_samples()
+            self._encoder = self._build_encoder()
 
     def _recalc_bitrate(self, _: bool):
-        self._encoder.bitrate = self._calc_bitrate()
+        with self._encoder_ready:
+            self._encoder.bitrate = self._calc_bitrate()
 
     @property
     def encoder_framesize(self):
@@ -34,6 +52,7 @@ class Encoder:
         return self._audio_per_packet
 
     def _calc_sample_size(self):
+        # Bytes of one 16 bit sample of every channel (one interleaved PCM frame).
         self._sample_size = self._channels * 2
 
     def _calc_samples(self):
@@ -41,9 +60,9 @@ class Encoder:
         self._samples = int(self.encoder_framesize * self._sample_rate * self._sample_size)
 
     def encode(self, pcm: bytes) -> bytes:
-        if len(pcm) < self._samples:
-            pcm += b"\x00" * (self._samples - len(pcm))
         with self._encoder_ready:
+            if len(pcm) < self._samples:
+                pcm += b"\x00" * (self._samples - len(pcm))
             try:
                 encoded = self._encoder.encode(pcm, len(pcm) // self._sample_size)
             except OpusError:
@@ -56,6 +75,7 @@ class Encoder:
 
     @property
     def samples(self):
+        """Bytes of interleaved 16 bit PCM, with `channels` channels, that make one encoded frame."""
         return self._samples
 
     def _calc_bitrate(self):
@@ -76,8 +96,9 @@ class Encoder:
 
     @bandwidth.setter
     def bandwidth(self, bandwidth: int):
-        self._bandwidth = bandwidth
-        self._encoder.bitrate = self._calc_bitrate()
+        with self._encoder_ready:
+            self._bandwidth = bandwidth
+            self._encoder.bitrate = self._calc_bitrate()
 
     @property
     def audio_per_packet(self):
@@ -89,9 +110,12 @@ class Encoder:
             raise ValueError(
                 f"Invalid audio frame duration: {adp}. It must be in [0.0025, 0.005, 0.01, 0.02, 0.04, 0.06]."
             )
-        self._audio_per_packet = adp
-        # FIXME(nico9889): this is changing the framesize
-        self._calc_samples()
+        with self._encoder_ready:
+            self._audio_per_packet = adp
+            # FIXME(nico9889): this is changing the framesize
+            self._calc_samples()
+            # The per packet overhead, and so the bitrate left to the audio, depends on the packet duration.
+            self._encoder.bitrate = self._calc_bitrate()
 
     @property
     def channels(self):
@@ -99,10 +123,8 @@ class Encoder:
 
     @channels.setter
     def channels(self, channels: int):
-        if channels != 1 and channels != 2:
-            raise ValueError("Invalid number of channels")
+        self._check_channels(channels)
         self._channels = channels
-        self._calc_samples()
         self._update_encoder()
 
     @property
@@ -112,7 +134,6 @@ class Encoder:
     @sample_rate.setter
     def sample_rate(self, rate: int):
         self._sample_rate = rate
-        self._calc_samples()
         self._update_encoder()
 
     @property

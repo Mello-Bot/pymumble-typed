@@ -4,15 +4,21 @@ from queue import Full, Queue
 from pymumble_typed.network.control import ControlStack
 from pymumble_typed.network.udp_data import AudioData
 from pymumble_typed.network.voice import VoiceStack
-from pymumble_typed.sound import SEQUENCE_DURATION, SEQUENCE_RESET_INTERVAL
+from pymumble_typed.sound import CHANNELS, SEQUENCE_DURATION, SEQUENCE_RESET_INTERVAL, CodecProfile
 from pymumble_typed.sound.encoder import Encoder
 
 
 class VoiceOutput:
-    def __init__(self, control: ControlStack, voice: VoiceStack):
+    def __init__(
+        self,
+        control: ControlStack,
+        voice: VoiceStack,
+        channels: int = CHANNELS,
+        codec_profile: CodecProfile = CodecProfile.Audio,
+    ):
         self.positional: [int, int, int] | None = None
         self._remaining_sample: bytes = b''
-        self._encoder: Encoder = Encoder(voice)
+        self._encoder: Encoder = Encoder(voice, channels, codec_profile)
         self._buffer: Queue[bytes] = Queue(maxsize=int(2 / self._encoder.audio_per_packet))
         self.target: int = 0
 

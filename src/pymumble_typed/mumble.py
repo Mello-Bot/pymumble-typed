@@ -116,6 +116,7 @@ class Mumble:
         self.blob_greedy_update = blob_greedy_update
         self._blob = BlobDB(self._logger, db_path)
         self._opus_profile = CodecProfile.Audio
+        # The channels of the PCM given to voice.add_pcm(): interleaved stereo, or mono.
         self._stereo = stereo
 
         self.sound_receive = False
@@ -135,11 +136,30 @@ class Mumble:
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
         self._ping.set_voice(self._voice)
         self._ping.set_control(self._control)
-        self.voice = VoiceOutput(self._control, self._voice)
+        self.voice = self._new_voice_output()
         self._reconnect = reconnect
 
         with suppress(ValueError):  # Workaround for Python 3.14, signal worked on Python <=3.13
             signal(SIGINT, lambda _, __: self.stop())
+
+    def _new_voice_output(self) -> VoiceOutput:
+        # Every VoiceOutput (one per connection) gets the configured channels and profile, so a reconnect
+        # doesn't fall back to the encoder defaults.
+        return VoiceOutput(self._control, self._voice, self.channel_count, self._opus_profile)
+
+    @property
+    def stereo(self) -> bool:
+        return self._stereo
+
+    @stereo.setter
+    def stereo(self, stereo: bool):
+        self._stereo = stereo
+        self.voice.encoder.channels = self.channel_count
+
+    @property
+    def channel_count(self) -> int:
+        """Channels of the PCM expected by voice.add_pcm(): 2 (interleaved) when stereo, else 1."""
+        return 2 if self._stereo else 1
 
     @property
     def sound_output(self):
@@ -202,7 +222,7 @@ class Mumble:
         self._control.set_control_message_dispatcher(self._dispatch_control_message)
         self._control.reconnect = self._reconnect
         self._voice: VoiceStack = VoiceStack(self._control, self._logger)
-        self.voice = VoiceOutput(self._control, self._voice)
+        self.voice = self._new_voice_output()
         self._control.set_disconnect_action(self._handle_disconnect)
         self._ping.set_control(self._control)
         self._ping.set_voice(self._voice)
@@ -434,6 +454,7 @@ class Mumble:
 
     def set_codec_profile(self, profile: CodecProfile):
         self._opus_profile = profile
+        self.voice.encoder.codec_profile = profile
 
     def get_codec_profile(self) -> CodecProfile:
         return self._opus_profile
